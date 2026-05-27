@@ -25,7 +25,7 @@ io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
 
   // Create or Join Room
-  socket.on('join_room', ({ roomId, playerName, maxPlayers }) => {
+  socket.on('join_room', ({ roomId, playerName, maxPlayers, playerId }) => {
     // If room doesn't exist, create it
     if (!rooms[roomId]) {
       const parsedMax = parseInt(maxPlayers) || 6;
@@ -40,22 +40,36 @@ io.on('connection', (socket) => {
 
     const room = rooms[roomId];
 
+    // Check if player is already in this room by persistentId (prevent double joining via same socket)
+    const existingPlayer = room.players.find(p => p.persistentId === playerId);
+    if (existingPlayer) {
+       // Update socket id for the reconnected player!
+       existingPlayer.id = socket.id;
+       if (room.engine) {
+          const enginePlayer = room.engine.players.find(p => p.persistentId === playerId);
+          if (enginePlayer) {
+             enginePlayer.id = socket.id;
+          }
+          room.gameState = room.engine.getState();
+       }
+       socket.join(roomId);
+       io.to(roomId).emit('room_update', room);
+       return;
+    }
+
     // Max players check
     if (room.players.length >= room.maxPlayers) {
       socket.emit('error_message', `Room is full! Maximum ${room.maxPlayers} players allowed.`);
       return;
     }
 
-    // Check if player is already in this room (prevent double joining via same socket)
-    const existingPlayer = room.players.find(p => p.id === socket.id);
-    if (!existingPlayer) {
-       room.players.push({
-         id: socket.id,
-         name: playerName,
-         color: null, // Assigned later
-         isReady: false
-       });
-    }
+    room.players.push({
+      id: socket.id,
+      persistentId: playerId,
+      name: playerName,
+      color: null, // Assigned later
+      isReady: false
+    });
 
     socket.join(roomId);
     
@@ -101,10 +115,27 @@ io.on('connection', (socket) => {
   });
 
   // Get current room state
-  socket.on('get_room_state', ({ roomId }) => {
+  socket.on('get_room_state', ({ roomId, playerId }) => {
     const room = rooms[roomId];
     if (room) {
-      if (room.engine) room.gameState = room.engine.getState();
+      if (playerId) {
+         // Update socket id if the player is reconnecting directly to the game page
+         const existingPlayer = room.players.find(p => p.persistentId === playerId);
+         if (existingPlayer) {
+            existingPlayer.id = socket.id;
+         }
+         if (room.engine) {
+            const enginePlayer = room.engine.players.find(p => p.persistentId === playerId);
+            if (enginePlayer) {
+               enginePlayer.id = socket.id;
+            }
+            room.gameState = room.engine.getState();
+         }
+      } else {
+         if (room.engine) room.gameState = room.engine.getState();
+      }
+      
+      socket.join(roomId); // Ensure they are in the socket room!
       socket.emit('room_update', room);
     } else {
       socket.emit('room_not_found');

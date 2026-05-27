@@ -35,7 +35,12 @@ const Lobby = () => {
   const handleJoin = (e) => {
     e.preventDefault();
     if (playerName && roomId) {
-      socket.emit('join_room', { roomId, playerName, maxPlayers });
+      let playerId = localStorage.getItem('ludo_player_id');
+      if (!playerId) {
+         playerId = Math.random().toString(36).substring(2, 15);
+         localStorage.setItem('ludo_player_id', playerId);
+      }
+      socket.emit('join_room', { roomId, playerName, maxPlayers, playerId });
     }
   };
 

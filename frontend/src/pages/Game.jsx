@@ -19,7 +19,8 @@ const Game = () => {
 
   useEffect(() => {
     // Request current state when loading the game page
-    socket.emit('get_room_state', { roomId });
+    const playerId = localStorage.getItem('ludo_player_id');
+    socket.emit('get_room_state', { roomId, playerId });
 
     socket.on('room_update', (data) => {
       setRoomData(data);

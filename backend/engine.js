@@ -7,6 +7,7 @@ class LudoEngine {
     // Initialize players with 4 tokens each
     this.players = players.map((p, index) => ({
       id: p.id,
+      persistentId: p.persistentId,
       name: p.name,
       colorIndex: index,
       tokens: [
