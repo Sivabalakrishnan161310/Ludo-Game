@@ -1,0 +1,132 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { io } from 'socket.io-client';
+import './Lobby.css';
+
+export const socket = io(import.meta.env.DEV ? `http://${window.location.hostname}:3001` : '/');
+
+const Lobby = () => {
+  const [playerName, setPlayerName] = useState('');
+  const [roomId, setRoomId] = useState('');
+  const [maxPlayers, setMaxPlayers] = useState(6);
+  const [roomData, setRoomData] = useState(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    socket.on('room_update', (data) => {
+      setRoomData(data);
+    });
+    
+    socket.on('game_started', (data) => {
+      navigate(`/game/${data.id}`);
+    });
+    
+    socket.on('error_message', (msg) => {
+      alert(msg);
+    });
+
+    return () => {
+      socket.off('room_update');
+      socket.off('game_started');
+      socket.off('error_message');
+    };
+  }, [navigate]);
+
+  const handleJoin = (e) => {
+    e.preventDefault();
+    if (playerName && roomId) {
+      socket.emit('join_room', { roomId, playerName, maxPlayers });
+    }
+  };
+
+  const handleReady = () => {
+    socket.emit('toggle_ready', { roomId: roomData.id });
+  };
+
+  const handleStartGame = () => {
+    socket.emit('start_game', { roomId: roomData.id });
+  };
+
+  if (roomData) {
+    const isHost = roomData.players.length > 0 && roomData.players[0].id === socket.id;
+    const allReady = roomData.players.every(p => p.isReady);
+    const canStart = isHost && roomData.players.length >= 2 && allReady;
+
+    return (
+      <div className="lobby-container modern-glass">
+        <h1 className="title">Room: {roomData.id}</h1>
+        <p className="subtitle">Max Players: {roomData.maxPlayers}</p>
+        <div className="players-list">
+          {roomData.players.map((p, idx) => (
+            <div key={p.id} className="player-card">
+              <div className="player-info">
+                <span className="player-name">{p.name}</span>
+                {p.id === socket.id && <span className="you-badge">(You)</span>}
+              </div>
+              <span className={`status-badge ${p.isReady ? 'ready' : 'not-ready'}`}>
+                {p.isReady ? 'Ready' : 'Waiting'}
+              </span>
+            </div>
+          ))}
+        </div>
+        <button className="primary-btn mt-4" onClick={handleReady}>
+          {roomData.players.find(p => p.id === socket.id)?.isReady ? 'Cancel Ready' : 'I am Ready!'}
+        </button>
+        {isHost && (
+          <button 
+            className="primary-btn mt-4 start-btn" 
+            onClick={handleStartGame}
+            disabled={!canStart}
+            style={{ 
+              opacity: canStart ? 1 : 0.5, 
+              background: canStart ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '' 
+            }}
+          >
+            Start Game
+          </button>
+        )}
+        {!isHost && <p className="subtitle mt-4">Waiting for host to start...</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="lobby-container modern-glass">
+      <h1 className="title glow-text">Neon Ludo</h1>
+      <p className="subtitle">Choose 2 to 6 Players</p>
+      <form onSubmit={handleJoin} className="join-form">
+        <input 
+          type="text" 
+          placeholder="Enter your name" 
+          value={playerName} 
+          onChange={(e) => setPlayerName(e.target.value)} 
+          required 
+          className="modern-input"
+        />
+        <input 
+          type="text" 
+          placeholder="Room Code" 
+          value={roomId} 
+          onChange={(e) => setRoomId(e.target.value)} 
+          required 
+          className="modern-input"
+        />
+        <div className="input-group">
+          <label style={{ color: '#a0aec0', fontSize: '0.9rem' }}>Max Players (if creating):</label>
+          <input 
+            type="number" 
+            min="2" 
+            max="6" 
+            value={maxPlayers} 
+            onChange={(e) => setMaxPlayers(e.target.value)} 
+            className="modern-input"
+            style={{ width: '100%', marginTop: '0.5rem' }}
+          />
+        </div>
+        <button type="submit" className="primary-btn">Join / Create Room</button>
+      </form>
+    </div>
+  );
+};
+
+export default Lobby;
