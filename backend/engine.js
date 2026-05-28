@@ -2,7 +2,7 @@ class LudoEngine {
   constructor(players) {
     this.N = Math.max(4, players.length); // 4, 5, or 6 arms
     this.mainTrackLength = this.N * 13;
-    this.travelToHomeStretch = this.mainTrackLength - 3; // Start is index 8. End of arm is 5. Distance = 13*N - 8 + 5 = N*13 - 3.
+    this.travelToHomeStretch = this.mainTrackLength - 2; // Start is index 8. End of arm is 6. Distance = 13*N - 8 + 6 = N*13 - 2.
 
     // Initialize players with 4 tokens each
     this.players = players.map((p, index) => ({
