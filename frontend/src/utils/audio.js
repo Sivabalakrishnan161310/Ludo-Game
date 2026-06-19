@@ -74,19 +74,28 @@ export const playSound = (soundName) => {
 
 export const playSteps = (stepsCount, durationPerStepMs = 200, finalSound = null) => {
   if (stepsCount <= 0) return;
-  let count = 0;
 
-  const interval = setInterval(() => {
-    count++;
+  initAudioContext();
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+
+  const now = audioCtx ? audioCtx.currentTime : 0;
+  
+  for (let i = 1; i <= stepsCount; i++) {
+    const isLast = i === stepsCount;
+    const soundName = (isLast && finalSound) ? finalSound : 'token_step';
+    const delaySecs = (i * durationPerStepMs) / 1000.0;
     
-    if (count === stepsCount && finalSound) {
-      playSound(finalSound);
+    if (audioCtx && audioCache[soundName] instanceof AudioBuffer) {
+      // Schedule exactly on the hardware clock
+      const source = audioCtx.createBufferSource();
+      source.buffer = audioCache[soundName];
+      source.connect(audioCtx.destination);
+      source.start(now + delaySecs);
     } else {
-      playSound('token_step');
+      // Fallback to setTimeout if Web Audio is unavailable or sound is not decoded yet
+      setTimeout(() => playSound(soundName), i * durationPerStepMs);
     }
-    
-    if (count >= stepsCount) {
-      clearInterval(interval);
-    }
-  }, durationPerStepMs);
+  }
 };
