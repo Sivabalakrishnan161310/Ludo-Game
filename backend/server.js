@@ -25,9 +25,13 @@ io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
 
   // Create or Join Room
-  socket.on('join_room', ({ roomId, playerName, maxPlayers, playerId }) => {
+  socket.on('join_room', ({ roomId, playerName, maxPlayers, playerId, isCreating }) => {
     // If room doesn't exist, create it
     if (!rooms[roomId]) {
+      if (isCreating === false) {
+        socket.emit('error_message', `Room ${roomId} does not exist. Please check the code.`);
+        return;
+      }
       const parsedMax = parseInt(maxPlayers) || 6;
       rooms[roomId] = {
         id: roomId,
@@ -36,6 +40,13 @@ io.on('connection', (socket) => {
         status: 'lobby', // 'lobby' | 'playing' | 'finished'
         gameState: null // Will hold the board state later
       };
+    } else if (isCreating) {
+      // Prevent creating a room that already exists unless reconnecting
+      const existing = rooms[roomId].players.find(p => p.persistentId === playerId);
+      if (!existing && rooms[roomId].players.length > 0) {
+        socket.emit('error_message', `Room ${roomId} already exists. Please join it instead.`);
+        return;
+      }
     }
 
     const room = rooms[roomId];
@@ -150,6 +161,16 @@ io.on('connection', (socket) => {
       if (success) {
         room.gameState = room.engine.getState();
         io.to(roomId).emit('room_update', room);
+
+        if (room.engine.state === 'animating_roll') {
+          setTimeout(() => {
+            if (rooms[roomId] && rooms[roomId].engine) {
+              rooms[roomId].engine.completeRollAnimation();
+              rooms[roomId].gameState = rooms[roomId].engine.getState();
+              io.to(roomId).emit('room_update', rooms[roomId]);
+            }
+          }, 1500); // 1.5s delay to let dice roll animation finish
+        }
       }
     }
   });
@@ -161,6 +182,17 @@ io.on('connection', (socket) => {
       if (success) {
         room.gameState = room.engine.getState();
         io.to(roomId).emit('room_update', room);
+
+        if (room.engine.state === 'animating') {
+          setTimeout(() => {
+            // Check if room still exists and engine state hasn't been corrupted
+            if (rooms[roomId] && rooms[roomId].engine) {
+              rooms[roomId].engine.completeAnimation();
+              rooms[roomId].gameState = rooms[roomId].engine.getState();
+              io.to(roomId).emit('room_update', rooms[roomId]);
+            }
+          }, 1500); // 1.5 seconds delay for animation
+        }
       }
     }
   });

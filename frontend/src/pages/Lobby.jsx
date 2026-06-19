@@ -32,6 +32,8 @@ const Lobby = () => {
     };
   }, [navigate]);
 
+  const [mode, setMode] = useState('select'); // 'select' | 'create' | 'join'
+
   const handleJoin = (e) => {
     e.preventDefault();
     if (playerName && roomId) {
@@ -40,7 +42,8 @@ const Lobby = () => {
          playerId = Math.random().toString(36).substring(2, 15);
          localStorage.setItem('ludo_player_id', playerId);
       }
-      socket.emit('join_room', { roomId, playerName, maxPlayers, playerId });
+      const isCreating = mode === 'create';
+      socket.emit('join_room', { roomId, playerName, maxPlayers, playerId, isCreating });
     }
   };
 
@@ -95,14 +98,24 @@ const Lobby = () => {
     );
   }
 
+  if (mode === 'select') {
+    return (
+      <div className="lobby-container modern-glass" style={{ gap: '1rem' }}>
+        <h1 className="title glow-text">Neon Ludo</h1>
+        <p className="subtitle" style={{ marginBottom: '1rem' }}>Welcome! Choose an option</p>
+        <button className="primary-btn" style={{ width: '100%' }} onClick={() => setMode('create')}>Create a Room</button>
+        <button className="primary-btn" style={{ width: '100%', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' }} onClick={() => setMode('join')}>Join a Room</button>
+      </div>
+    );
+  }
+
   return (
     <div className="lobby-container modern-glass">
-      <h1 className="title glow-text">Neon Ludo</h1>
-      <p className="subtitle">Choose 2 to 6 Players</p>
+      <h1 className="title glow-text">{mode === 'create' ? 'Create Room' : 'Join Room'}</h1>
       <form onSubmit={handleJoin} className="join-form">
         <input 
           type="text" 
-          placeholder="Enter your name" 
+          placeholder="Your Name" 
           value={playerName} 
           onChange={(e) => setPlayerName(e.target.value)} 
           required 
@@ -116,19 +129,32 @@ const Lobby = () => {
           required 
           className="modern-input"
         />
-        <div className="input-group">
-          <label style={{ color: '#a0aec0', fontSize: '0.9rem' }}>Max Players (if creating):</label>
-          <input 
-            type="number" 
-            min="2" 
-            max="6" 
-            value={maxPlayers} 
-            onChange={(e) => setMaxPlayers(e.target.value)} 
-            className="modern-input"
-            style={{ width: '100%', marginTop: '0.5rem' }}
-          />
-        </div>
-        <button type="submit" className="primary-btn">Join / Create Room</button>
+        {mode === 'create' && (
+          <div className="input-group">
+            <label style={{ color: '#a0aec0', fontSize: '0.9rem' }}>Max Players (2-6):</label>
+            <input 
+              type="number" 
+              min="2" 
+              max="6" 
+              value={maxPlayers} 
+              onChange={(e) => setMaxPlayers(e.target.value)} 
+              className="modern-input"
+              style={{ width: '100%', marginTop: '0.5rem' }}
+            />
+          </div>
+        )}
+        <button type="submit" className="primary-btn" style={{ marginTop: '1rem' }}>
+          {mode === 'create' ? 'Create Room' : 'Join Game'}
+        </button>
+        <button 
+          type="button" 
+          onClick={() => setMode('select')} 
+          style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'white', padding: '1rem', borderRadius: '12px', cursor: 'pointer', fontSize: '1.1rem', fontWeight: '600', transition: 'background 0.3s' }}
+          onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.1)'}
+          onMouseOut={(e) => e.target.style.background = 'transparent'}
+        >
+          Back
+        </button>
       </form>
     </div>
   );

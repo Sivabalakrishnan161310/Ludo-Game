@@ -5,6 +5,7 @@ import { socket } from './Lobby';
 import Board from '../components/Board';
 import BoardClassic from '../components/BoardClassic';
 import Dice from '../components/Dice';
+import { playSound } from '../utils/audio';
 
 const classicColors = ['#e63946', '#2a9d8f', '#e9c46a', '#457b9d'];
 const starColors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#a855f7', '#06b6d4'];
@@ -40,12 +41,36 @@ const Game = () => {
   useEffect(() => {
     if (roomData && roomData.gameState) {
       const action = roomData.gameState.lastAction;
-      if (action !== prevAction && action.includes('rolled a')) {
-        setRollTrigger(prev => prev + 1);
+      if (action !== prevAction) {
+        if (action.includes('rolled a')) {
+          setRollTrigger(prev => prev + 1);
+          playSound('dice_roll');
+        }
+        
+        if (action.includes('HAS WON THE GAME')) {
+          playSound('dude_oorum_blood');
+        }
+
         setPrevAction(action);
       }
     }
   }, [roomData, prevAction]);
+
+  useEffect(() => {
+    if (roomData && roomData.gameState && roomData.gameState.state === 'waiting_for_move') {
+      const gameState = roomData.gameState;
+      const activePlayer = gameState.players[gameState.turnIndex];
+      
+      // Auto move if there is exactly 1 valid move
+      if (activePlayer.id === socket.id && gameState.validMoves && gameState.validMoves.length === 1) {
+        // Ensure dice animation has time to finish (600ms) before snapping the piece
+        const timer = setTimeout(() => {
+          socket.emit('move_token', { roomId, tokenId: gameState.validMoves[0] });
+        }, 800);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [roomData, roomId]);
 
   const handleTokenClick = (tokenId) => {
     if (roomData && roomData.gameState && roomData.gameState.state === 'waiting_for_move') {
@@ -87,10 +112,10 @@ const Game = () => {
     };
 
     switch(diff) {
-      case 0: return { ...baseStyle, bottom: '2rem', left: '2rem', flexDirection: 'row' }; // Bottom-Left (Local)
-      case 1: return { ...baseStyle, top: '5rem', left: '2rem', flexDirection: 'row' };    // Top-Left
-      case 2: return { ...baseStyle, top: '5rem', right: '2rem', flexDirection: 'row-reverse' }; // Top-Right
-      case 3: return { ...baseStyle, bottom: '2rem', right: '2rem', flexDirection: 'row-reverse' }; // Bottom-Right
+      case 0: return { ...baseStyle, bottom: '2rem', left: '2rem', flexDirection: 'column' }; // Bottom-Left (Local)
+      case 1: return { ...baseStyle, top: '5rem', left: '2rem', flexDirection: 'column' };    // Top-Left
+      case 2: return { ...baseStyle, top: '5rem', right: '2rem', flexDirection: 'column' }; // Top-Right
+      case 3: return { ...baseStyle, bottom: '2rem', right: '2rem', flexDirection: 'column' }; // Bottom-Right
       default: return baseStyle;
     }
   };
@@ -137,14 +162,14 @@ const Game = () => {
 
             {/* Dice & Turn Actions */}
             <div className="modern-glass" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '1.5rem', borderRadius: '16px', background: 'rgba(255,255,255,0.05)' }}>
-              <h3 style={{ margin: 0, color: '#d8b4fe' }}>Turn: {activePlayer.name}</h3>
-              <Dice value={gameState.diceRoll || 1} rollTrigger={rollTrigger} />
-              <div style={{ minHeight: '60px', display: 'flex', alignItems: 'center' }}>
-                {isMyTurn && gameState.state === 'waiting_for_roll' && (
-                  <button className="primary-btn" onClick={handleRollDice} style={{ padding: '0.8rem 2rem', fontSize: '1.2rem', width: '100%' }}>
-                    Roll Dice
-                  </button>
-                )}
+              <div 
+                style={{ cursor: (isMyTurn && gameState.state === 'waiting_for_roll') ? 'pointer' : 'default' }}
+                onClick={(isMyTurn && gameState.state === 'waiting_for_roll') ? handleRollDice : undefined}
+              >
+                <Dice value={gameState.diceRoll || 1} rollTrigger={rollTrigger} />
+              </div>
+              <h3 style={{ margin: 0, color: '#d8b4fe' }}>{activePlayer.name}</h3>
+              <div style={{ minHeight: '30px', display: 'flex', alignItems: 'center', marginTop: '0.5rem' }}>
                 {isMyTurn && gameState.state === 'waiting_for_move' && (
                   <p style={{ color: '#34d399', fontWeight: 'bold', margin: 0, textAlign: 'center' }}>Select a token to move</p>
                 )}
@@ -181,23 +206,29 @@ const Game = () => {
                 animate={pulseAnimation}
                 transition={isThisPlayersTurn ? { repeat: Infinity, duration: 1.5, ease: "easeInOut" } : { duration: 0.3 }}
               >
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {/* Dice on top */}
+                <div 
+                  style={{ 
+                    transform: 'scale(0.8)', 
+                    transformOrigin: 'center', 
+                    opacity: isThisPlayersTurn ? 1 : 0, 
+                    pointerEvents: isThisPlayersTurn ? 'auto' : 'none',
+                    transition: 'opacity 0.3s',
+                    cursor: (isThisPlayersTurn && isMyTurn && gameState.state === 'waiting_for_roll') ? 'pointer' : 'default'
+                  }}
+                  onClick={(isThisPlayersTurn && isMyTurn && gameState.state === 'waiting_for_roll') ? handleRollDice : undefined}
+                >
+                  <Dice value={isThisPlayersTurn ? (gameState.diceRoll || 1) : 1} rollTrigger={rollTrigger} />
+                </div>
+                
+                {/* Player info under the dice */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                   <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'white', opacity: isThisPlayersTurn ? 1 : 0.6 }}>{p.name}</span>
                   {p.id === socket.id && <span style={{ fontSize: '0.8rem', color: '#a855f7', fontWeight: 'bold', opacity: isThisPlayersTurn ? 1 : 0.6 }}>YOU</span>}
                   
-                  {isThisPlayersTurn && isMyTurn && gameState.state === 'waiting_for_roll' && (
-                    <button className="primary-btn" onClick={handleRollDice} style={{ padding: '0.5rem 1rem', fontSize: '0.9rem', marginTop: '0.5rem' }}>
-                      Roll
-                    </button>
-                  )}
                   {isThisPlayersTurn && isMyTurn && gameState.state === 'waiting_for_move' && (
-                    <span style={{ color: '#34d399', fontSize: '0.8rem', marginTop: '0.5rem' }}>Move token</span>
+                    <span style={{ color: '#34d399', fontSize: '0.8rem', marginTop: '0.5rem', fontWeight: 'bold' }}>Move token</span>
                   )}
-                </div>
-                
-                {/* Scaled down dice for the player. Dim it heavily if it's not their turn! */}
-                <div style={{ transform: 'scale(0.6)', transformOrigin: 'center', opacity: isThisPlayersTurn ? 1 : 0.3, transition: 'opacity 0.3s' }}>
-                  <Dice value={isThisPlayersTurn ? (gameState.diceRoll || 1) : 1} rollTrigger={isThisPlayersTurn ? rollTrigger : 0} />
                 </div>
               </motion.div>
             );

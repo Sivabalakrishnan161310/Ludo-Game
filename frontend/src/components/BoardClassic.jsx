@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { playSteps, playSound } from '../utils/audio';
 
 // Classic 4-Player Ludo Colors matching the NEW image exactly
 const colors = ['#ef4444', '#3b82f6', '#facc15', '#22c55e']; // Vibrant Red, Blue, Yellow, Green
@@ -36,10 +37,10 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
   ];
 
   const baseCenters = [
-    [[2, 2], [2, 4], [4, 2], [4, 4]],         // Red Base
-    [[2, 11], [2, 13], [4, 11], [4, 13]],     // Blue Base
-    [[11, 11], [11, 13], [13, 11], [13, 13]], // Yellow Base
-    [[11, 2], [11, 4], [13, 2], [13, 4]]      // Green Base
+    [[1.5, 1.5], [1.5, 3.5], [3.5, 1.5], [3.5, 3.5]],         // Red Base
+    [[1.5, 10.5], [1.5, 12.5], [3.5, 10.5], [3.5, 12.5]],     // Blue Base
+    [[10.5, 10.5], [10.5, 12.5], [12.5, 10.5], [12.5, 12.5]], // Yellow Base
+    [[10.5, 1.5], [10.5, 3.5], [12.5, 1.5], [12.5, 3.5]]      // Green Base
   ];
 
   const getTokenPosition = (colorIndex, token) => {
@@ -146,12 +147,36 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
           const pColorIndex = player.colorIndex % 4;
           const path = calculatePath(pColorIndex, prevToken, token);
           if (path && path.length > 0) {
+            const isVictim = prevToken.status === 'main' && token.status === 'base';
+            const isUnlock = prevToken.status === 'base' && token.status === 'main';
+            const isHome = prevToken.status !== 'home' && token.status === 'home';
+            
+            // Check safe zone landing
+            const greyStarIndices = [3, 16, 29, 42];
+            const startIndices = [8, 21, 34, 47];
+            const isSafeZoneLanding = token.status === 'main' && (greyStarIndices.includes(token.position) || startIndices.includes(token.position));
+
+            // Check if this token was the one that captured
+            const didCapture = gameState && gameState.lastAction && gameState.lastAction.includes('captured') && gameState.players[gameState.turnIndex].id === player.id;
+
             // Use unique key combining player ID and token ID
             newAnimData[`${player.id}-${token.id}`] = { 
               path, 
-              isCapture: prevToken.status === 'main' && token.status === 'base' 
+              isCapture: isVictim 
             };
             hasChanges = true;
+
+            let finalSound = null;
+            if (isHome) finalSound = 'token_home';
+            else if (didCapture) finalSound = 'token_kill';
+            else if (isSafeZoneLanding) finalSound = 'safe_zone';
+
+            // Trigger step sounds for regular moves (not captures getting sucked back)
+            if (isUnlock) {
+               playSound('token_unlock');
+            } else if (!isVictim) {
+               playSteps(path.length, 200, finalSound); // 0.2s per step, replaces last step with finalSound
+            }
           }
         }
       });
@@ -225,11 +250,11 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
         <rect x={b.c * cellSize} y={b.r * cellSize} width={cellSize * 6} height={cellSize * 6} fill={b.color} stroke="black" strokeWidth="2" />
         {/* Inner white rect */}
         <rect x={b.c * cellSize + cellSize} y={b.r * cellSize + cellSize} width={cellSize * 4} height={cellSize * 4} fill="white" />
-        {/* 4 Circles */}
-        <circle cx={b.c * cellSize + cellSize * 2} cy={b.r * cellSize + cellSize * 2} r={cellSize * 0.8} fill={b.color} />
-        <circle cx={b.c * cellSize + cellSize * 4} cy={b.r * cellSize + cellSize * 2} r={cellSize * 0.8} fill={b.color} />
-        <circle cx={b.c * cellSize + cellSize * 2} cy={b.r * cellSize + cellSize * 4} r={cellSize * 0.8} fill={b.color} />
-        <circle cx={b.c * cellSize + cellSize * 4} cy={b.r * cellSize + cellSize * 4} r={cellSize * 0.8} fill={b.color} />
+        {/* 4 Circles (Sized exactly to match the tokens) */}
+        <circle cx={b.c * cellSize + cellSize * 2} cy={b.r * cellSize + cellSize * 2} r={16} fill="#e2e8f0" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
+        <circle cx={b.c * cellSize + cellSize * 4} cy={b.r * cellSize + cellSize * 2} r={16} fill="#e2e8f0" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
+        <circle cx={b.c * cellSize + cellSize * 2} cy={b.r * cellSize + cellSize * 4} r={16} fill="#e2e8f0" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
+        <circle cx={b.c * cellSize + cellSize * 4} cy={b.r * cellSize + cellSize * 4} r={16} fill="#e2e8f0" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
       </g>
     ));
   };
@@ -254,6 +279,10 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
     if (!gameState || gameState.state !== 'waiting_for_move') return false;
     const activePlayer = gameState.players[gameState.turnIndex];
     if (activePlayer.id !== player.id) return false;
+    
+    if (gameState.validMoves) {
+      return gameState.validMoves.includes(token.id);
+    }
     
     const diceRoll = gameState.diceRoll;
     if (token.status === 'base' && diceRoll !== 6) return false;
