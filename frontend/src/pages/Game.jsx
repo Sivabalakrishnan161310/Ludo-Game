@@ -7,7 +7,7 @@ import BoardClassic from '../components/BoardClassic';
 import Dice from '../components/Dice';
 import { playSound } from '../utils/audio';
 
-const classicColors = ['#e63946', '#2a9d8f', '#e9c46a', '#457b9d'];
+const classicColors = ['#EB1C24', '#66CCFF', '#FFE013', '#02A04B'];
 const starColors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#a855f7', '#06b6d4'];
 
 const CelebrationOverlay = ({ winner }) => {

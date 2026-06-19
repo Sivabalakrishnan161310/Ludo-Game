@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { playSteps, playSound } from '../utils/audio';
 
 // Ludo King exact board colors
-const colors = ['#EB1C24', '#22409A', '#FFE013', '#02A04B']; // Red, Blue, Yellow, Green
+const colors = ['#EB1C24', '#66CCFF', '#FFE013', '#02A04B']; // Red, Blue, Yellow, Green
 const colorsLight = ['#FF6B6B', '#5B7FCC', '#FFF06B', '#4CD97B']; // Lighter variants for gradients
 const colorsDark = ['#B01018', '#172E6E', '#CCB00F', '#017A38']; // Darker variants for gradients
 
