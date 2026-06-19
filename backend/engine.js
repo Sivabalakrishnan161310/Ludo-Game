@@ -189,14 +189,15 @@ class LudoEngine {
       
       const activePlayers = this.players.filter(p => !p.isKicked && !p.rank);
       if (activePlayers.length === 0) {
-        this.state = 'finished';
+        this.pendingCelebration = true;
+        this.pendingNextTurn = true; // nextTurn will handle game over
         this.lastAction = 'Everyone has finished!';
       } else if (activePlayers.length === 1) {
         // Only one player left, they are the loser!
         activePlayers[0].rank = this.currentRank;
-        this.state = 'finished';
+        this.pendingCelebration = true;
+        this.pendingNextTurn = true; // nextTurn will handle game over transition
         this.lastAction = `${this.activePlayer.name} finished ${this.getRankName(this.activePlayer.rank)}! ${activePlayers[0].name} is the LOSER!`;
-        this.pendingNextTurn = false; // Game over
       } else {
         // Still players left, trigger celebration
         this.pendingCelebration = true;
