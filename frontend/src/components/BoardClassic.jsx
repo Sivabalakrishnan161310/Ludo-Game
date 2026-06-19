@@ -170,7 +170,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
             if (isUnlock) {
                playSound('token_unlock');
             } else if (!isVictim) {
-               playSteps(path.length, 120, finalSound);
+               playSteps(path.length, 200, finalSound);
             }
           }
         }
@@ -218,10 +218,10 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
                       delete next[key];
                       return next;
                     });
-                  }, 150); // Quick cleanup after tween settles
+                  }, 250); // Wait for hop to settle
                   animTimersRef.current[key].push(cleanup);
                 }
-              }, idx * 120); // 120ms per tile — fast like Ludo King
+              }, idx * 200); // 200ms per tile
               animTimersRef.current[key].push(timer);
             });
           }
@@ -243,7 +243,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
     const cells = [];
     for (let i = 0; i < 52; i++) {
       const [r, c] = track[i];
-      let fill = '#FFF8E7';  // Cream to match board
+      let fill = 'white';
       let content = null;
       
       // Stars and Safe Zones logic matching Ludo King
@@ -354,7 +354,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
           width: '100%', height: '100%',
           transform: `rotate(${boardRotation}deg)`, 
           transition: 'transform 1s ease-in-out',
-          background: '#FFF8E7',
+          background: 'white',
           borderRadius: '12px',
           boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
         }} 
@@ -446,7 +446,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
               animateProps = { x: stepPos.x, y: stepPos.y };
               transitionProps = {
                 type: "tween",
-                duration: 0.12,
+                duration: 0.18,
                 ease: "easeOut"
               };
             } else if (prevPlayers) {
@@ -482,7 +482,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
               // During a step, do a quick arc: jump up then land
               innerAnimate = { y: [0, -18, 0], scale: [1, 1.15, 1] };
               innerTransition = { 
-                duration: 0.12, 
+                duration: 0.2, 
                 ease: "easeOut",
                 times: [0, 0.4, 1]
               };
