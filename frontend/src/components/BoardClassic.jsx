@@ -128,6 +128,10 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
   const prevPlayers = usePrevious(players);
   const lastSoundTriggerRef = useRef(null);
 
+  // Step-by-step hopping animation state
+  const [tokenAnimPos, setTokenAnimPos] = useState({});
+  const animTimersRef = useRef({});
+
   useEffect(() => {
     if (!prevPlayers) return;
     
@@ -171,6 +175,67 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
       });
     });
   }, [players, prevPlayers, gameState]);
+
+  // Step-by-step hopping animation: feed one square at a time to framer-motion
+  useEffect(() => {
+    if (!prevPlayers) return;
+
+    players.forEach(player => {
+      const prevPlayer = prevPlayers.find(p => p.id === player.id);
+      if (!prevPlayer) return;
+      const pColorIndex = player.colorIndex % 4;
+
+      player.tokens.forEach(token => {
+        const prevToken = prevPlayer.tokens.find(t => t.id === token.id);
+        if (!prevToken) return;
+
+        if (prevToken.status !== token.status || prevToken.position !== token.position) {
+          const isCapture = prevToken.status === 'main' && token.status === 'base';
+          if (isCapture) return; // Captures use the fast slide-back, not hopping
+
+          const path = calculatePath(pColorIndex, prevToken, token);
+          if (path && path.length > 0) {
+            const key = `${player.id}-${token.id}`;
+
+            // Clear any previous animation timers for this token
+            if (animTimersRef.current[key]) {
+              animTimersRef.current[key].forEach(clearTimeout);
+            }
+            animTimersRef.current[key] = [];
+
+            // Queue each step with a delay
+            path.forEach((pos, idx) => {
+              const timer = setTimeout(() => {
+                setTokenAnimPos(prev => ({ ...prev, [key]: pos }));
+
+                // After last step, clean up so token snaps to its true final position
+                if (idx === path.length - 1) {
+                  const cleanup = setTimeout(() => {
+                    setTokenAnimPos(prev => {
+                      const next = { ...prev };
+                      delete next[key];
+                      return next;
+                    });
+                  }, 350); // Wait for spring to settle
+                  animTimersRef.current[key].push(cleanup);
+                }
+              }, idx * 200); // 200ms between each hop
+              animTimersRef.current[key].push(timer);
+            });
+          }
+        }
+      });
+    });
+  }, [players, prevPlayers]);
+
+  // Cleanup animation timers on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(animTimersRef.current).forEach(timers => {
+        timers.forEach(clearTimeout);
+      });
+    };
+  }, []);
 
   const renderCells = () => {
     const cells = [];
@@ -358,137 +423,70 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
           return allTokens.map(({ player, token, pColorIndex, x, y, ox, oy, isHighlight }) => {
             const finalX = x + ox;
             const finalY = y + oy;
-            
-            // Calculate anim data inline
-            let animData = null;
-            if (prevPlayers) {
-               const prevPlayer = prevPlayers.find(p => p.id === player.id);
-               if (prevPlayer) {
-                  const prevToken = prevPlayer.tokens.find(t => t.id === token.id);
-                  if (prevToken && (prevToken.status !== token.status || prevToken.position !== token.position)) {
-                     const path = calculatePath(pColorIndex, prevToken, token);
-                     if (path && path.length > 0) {
-                        const originPos = getTokenPosition(pColorIndex, prevToken);
-                        animData = {
-                           path,
-                           originX: originPos.x,
-                           originY: originPos.y,
-                           isCapture: prevToken.status === 'main' && token.status === 'base'
-                        };
-                     }
+            const key = `${player.id}-${token.id}`;
+            const stepPos = tokenAnimPos[key];
+
+            let animateProps = { x: finalX, y: finalY };
+            let transitionProps = { type: "spring", stiffness: 300, damping: 25 };
+
+            if (stepPos) {
+              // HOPPING: Step animation is active — target is the current step square
+              animateProps = { x: stepPos.x, y: stepPos.y };
+              transitionProps = {
+                type: "spring",
+                stiffness: 800,
+                damping: 15,
+                mass: 0.5
+              };
+            } else if (prevPlayers) {
+              // Check for capture animation (fast slide back to base)
+              const prevPlayer = prevPlayers.find(p => p.id === player.id);
+              if (prevPlayer) {
+                const prevToken = prevPlayer.tokens.find(t => t.id === token.id);
+                if (prevToken && prevToken.status === 'main' && token.status === 'base') {
+                  const path = calculatePath(pColorIndex, prevToken, token);
+                  if (path && path.length > 0) {
+                    const N = path.length;
+                    animateProps = {
+                      x: [null, ...path.map(p => p.x), finalX],
+                      y: [null, ...path.map(p => p.y), finalY]
+                    };
+                    const keyframesCount = N + 2;
+                    const times = Array.from({ length: keyframesCount }).map((_, i) => i / (keyframesCount - 1));
+                    const totalDuration = (N + 1) * 0.05;
+                    transitionProps = {
+                      x: { duration: totalDuration, times, ease: "linear" },
+                      y: { duration: totalDuration, times, ease: "linear" }
+                    };
                   }
-               }
-            }
-            let outerAnimateProps = { x: finalX, y: finalY };
-            let outerTransitionProps = { type: "spring", stiffness: 300, damping: 25 };
-            let innerAnimateProps = { x: 0, y: 0, scale: 1 };
-            let innerTransitionProps = { duration: 0 };
-
-            if (animData && animData.path && animData.path.length > 0) {
-              const pathCoords = animData.path;
-              const isCapture = animData.isCapture;
-              const N = pathCoords.length;
-
-              if (isCapture) {
-                // Smooth rapid slide back to base for captured tokens
-                outerAnimateProps = {
-                  x: [null, ...pathCoords.map(p => p.x), finalX],
-                  y: [null, ...pathCoords.map(p => p.y), finalY]
-                };
-                const keyframesCount = N + 2;
-                const times = Array.from({ length: keyframesCount }).map((_, i) => i / (keyframesCount - 1));
-                const totalDuration = (N + 1) * 0.05;
-                outerTransitionProps = {
-                  x: { duration: totalDuration, times, ease: "linear" },
-                  y: { duration: totalDuration, times, ease: "linear" }
-                };
-              } else {
-                // FROG HOP ANIMATION: Outer group slides shadow, Inner group jumps coin
-                const outerX = [animData.originX];
-                const outerY = [animData.originY];
-                const outerTimes = [0];
-
-                const innerX = [0];
-                const innerY = [0];
-                const innerScale = [1];
-                const innerTimes = [0];
-
-                // Calculate vector pointing strictly "UP" on the user's screen
-                const theta = boardRotation * Math.PI / 180;
-                const upJumpX = -35 * Math.sin(theta);
-                const upJumpY = -35 * Math.cos(theta);
-
-                pathCoords.forEach((p, idx) => {
-                  const T_start = idx / (N + 1);
-                  const T_step = 1 / (N + 1);
-
-                  // Outer logic: Slides directly to next box, then rests.
-                  outerX.push(p.x, p.x);
-                  outerY.push(p.y, p.y);
-                  outerTimes.push(T_start + T_step * 0.7, T_start + T_step); // Slide takes 70%, rest takes 30%
-
-                  // Inner logic: Arc up into the air, land down, then rest.
-                  innerX.push(upJumpX, 0, 0);
-                  innerY.push(upJumpY, 0, 0);
-                  innerScale.push(1.6, 1, 1);
-                  innerTimes.push(T_start + T_step * 0.35, T_start + T_step * 0.7, T_start + T_step);
-                });
-
-                // Final offset slide (stacking)
-                outerX.push(finalX);
-                outerY.push(finalY);
-                outerTimes.push(1.0);
-
-                innerX.push(0);
-                innerY.push(0);
-                innerScale.push(1);
-                innerTimes.push(1.0);
-
-                outerAnimateProps = { x: outerX, y: outerY };
-                outerTransitionProps = {
-                  duration: (N + 1) * 0.35,
-                  times: outerTimes,
-                  ease: "linear"
-                };
-
-                innerAnimateProps = { x: innerX, y: innerY, scale: innerScale };
-                innerTransitionProps = {
-                  duration: (N + 1) * 0.35,
-                  times: innerTimes,
-                  ease: "linear"
-                };
+                }
               }
             }
 
             if (isHighlight) {
-               innerAnimateProps.scale = [1, 1.25, 1];
-               innerTransitionProps.scale = { repeat: Infinity, duration: 1, ease: "easeInOut" };
-            } else if (!innerAnimateProps.scale) {
-               innerAnimateProps.scale = 1;
+               animateProps.scale = [1, 1.25, 1];
+               transitionProps.scale = { repeat: Infinity, duration: 1, ease: "easeInOut" };
+            } else if (!animateProps.scale) {
+               animateProps.scale = 1;
             }
             
             return (
               <motion.g
-                key={`token-${player.id}-${token.id}`}
+                key={key}
                 initial={false}
-                animate={outerAnimateProps}
-                transition={outerTransitionProps}
+                animate={animateProps}
+                transition={transitionProps}
                 style={{ cursor: isHighlight ? 'pointer' : 'default' }}
                 onClick={() => onTokenClick && onTokenClick(token.id)}
               >
-                {/* 1. GROUND SHADOW (Stays flat on the board and slides square by square) */}
-                <circle cx={0} cy={0} r={14} fill="rgba(0,0,0,0.5)" filter="blur(3px)" transform="translate(4, 6)" />
-
-                {/* 2. PHYSICAL COIN (Jumps into the air away from the shadow!) */}
-                <motion.g animate={innerAnimateProps} transition={innerTransitionProps}>
-                  <circle cx={0} cy={0} r={14} fill={colors[pColorIndex]} stroke="white" strokeWidth="2" />
-                  <circle cx={0} cy={0} r={8} fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" />
-                  
-                  {/* Extra glowing ring if highlighted */}
-                  {isHighlight && (
-                    <circle cx={0} cy={0} r={18} fill="none" stroke="white" strokeWidth="2" strokeDasharray="4 4" opacity="0.8" />
-                  )}
-                </motion.g>
+                {/* 3D Coin look */}
+                <circle cx={0} cy={0} r={14} fill={colors[pColorIndex]} filter="url(#classicCoinShadow)" stroke="white" strokeWidth="2" />
+                <circle cx={0} cy={0} r={8} fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" />
+                
+                {/* Extra glowing ring if highlighted */}
+                {isHighlight && (
+                  <circle cx={0} cy={0} r={18} fill="none" stroke="white" strokeWidth="2" strokeDasharray="4 4" opacity="0.8" />
+                )}
               </motion.g>
             );
           });
