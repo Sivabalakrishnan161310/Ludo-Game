@@ -126,15 +126,10 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
   };
 
   const prevPlayers = usePrevious(players);
-  const [tokenAnimData, setTokenAnimData] = useState({});
+  const lastSoundTriggerRef = useRef(null);
 
-  // useLayoutEffect runs before the browser paints, eliminating the 1-frame flicker glitch!
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!prevPlayers) return;
-    
-    // Start fresh! This ensures tokens don't replay old animations on subsequent renders
-    let newAnimData = {}; 
-    let hasChanges = false;
     
     players.forEach(player => {
       const prevPlayer = prevPlayers.find(p => p.id === player.id);
@@ -145,6 +140,10 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
         if (!prevToken) return;
         
         if (prevToken.status !== token.status || prevToken.position !== token.position) {
+          const soundKey = `${player.id}-${token.id}-${token.position}-${token.status}`;
+          if (lastSoundTriggerRef.current === soundKey) return;
+          lastSoundTriggerRef.current = soundKey;
+
           const pColorIndex = player.colorIndex % 4;
           const path = calculatePath(pColorIndex, prevToken, token);
           if (path && path.length > 0) {
@@ -152,47 +151,26 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
             const isUnlock = prevToken.status === 'base' && token.status === 'main';
             const isHome = prevToken.status !== 'home' && token.status === 'home';
             
-            // Get exact starting coordinates
-            const originPos = getTokenPosition(pColorIndex, prevToken);
-
-            // Check safe zone landing
             const greyStarIndices = [3, 16, 29, 42];
             const startIndices = [8, 21, 34, 47];
             const isSafeZoneLanding = token.status === 'main' && (greyStarIndices.includes(token.position) || startIndices.includes(token.position));
-
-            // Check if this token was the one that captured
             const didCapture = gameState && gameState.lastAction && gameState.lastAction.includes('captured') && gameState.players[gameState.turnIndex].id === player.id;
-
-            // Use unique key combining player ID and token ID
-            newAnimData[`${player.id}-${token.id}`] = { 
-              path, 
-              originX: originPos.x,
-              originY: originPos.y,
-              isCapture: isVictim 
-            };
-            hasChanges = true;
 
             let finalSound = null;
             if (isHome) finalSound = 'token_home';
             else if (didCapture) finalSound = 'token_kill';
             else if (isSafeZoneLanding) finalSound = 'safe_zone';
 
-            // Trigger step sounds for regular moves (not captures getting sucked back)
             if (isUnlock) {
                playSound('token_unlock');
             } else if (!isVictim) {
-               playSteps(path.length, 250, finalSound); // 0.25s per step, replaces last step with finalSound
+               playSteps(path.length, 250, finalSound);
             }
           }
         }
       });
     });
-    
-    // Always clear old animation data or set the new one
-    if (hasChanges || Object.keys(tokenAnimData).length > 0) {
-      setTokenAnimData(newAnimData);
-    }
-  }, [players]);
+  }, [players, prevPlayers, gameState]);
 
   const renderCells = () => {
     const cells = [];
@@ -381,8 +359,26 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
             const finalX = x + ox;
             const finalY = y + oy;
             
-            // Unique key to prevent players' tokens from interchanging animations
-            const animData = tokenAnimData[`${player.id}-${token.id}`];
+            // Calculate anim data inline
+            let animData = null;
+            if (prevPlayers) {
+               const prevPlayer = prevPlayers.find(p => p.id === player.id);
+               if (prevPlayer) {
+                  const prevToken = prevPlayer.tokens.find(t => t.id === token.id);
+                  if (prevToken && (prevToken.status !== token.status || prevToken.position !== token.position)) {
+                     const path = calculatePath(pColorIndex, prevToken, token);
+                     if (path && path.length > 0) {
+                        const originPos = getTokenPosition(pColorIndex, prevToken);
+                        animData = {
+                           path,
+                           originX: originPos.x,
+                           originY: originPos.y,
+                           isCapture: prevToken.status === 'main' && token.status === 'base'
+                        };
+                     }
+                  }
+               }
+            }
             let animateProps = { x: finalX, y: finalY };
             let transitionProps = { type: "spring", stiffness: 300, damping: 25 };
 
