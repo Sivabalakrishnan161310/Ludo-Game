@@ -168,7 +168,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
             if (isUnlock) {
                playSound('token_unlock');
             } else if (!isVictim) {
-               playSteps(path.length, 250, finalSound);
+               playSteps(path.length, 120, finalSound);
             }
           }
         }
@@ -216,10 +216,10 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
                       delete next[key];
                       return next;
                     });
-                  }, 350); // Wait for spring to settle
+                  }, 150); // Quick cleanup after tween settles
                   animTimersRef.current[key].push(cleanup);
                 }
-              }, idx * 200); // 200ms between each hop
+              }, idx * 120); // 120ms per tile — fast like Ludo King
               animTimersRef.current[key].push(timer);
             });
           }
@@ -430,13 +430,12 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
             let transitionProps = { type: "spring", stiffness: 300, damping: 25 };
 
             if (stepPos) {
-              // HOPPING: Step animation is active — target is the current step square
+              // HOPPING: Ludo King style — fast tween, no bounce
               animateProps = { x: stepPos.x, y: stepPos.y };
               transitionProps = {
-                type: "spring",
-                stiffness: 800,
-                damping: 15,
-                mass: 0.5
+                type: "tween",
+                duration: 0.12,
+                ease: "easeOut"
               };
             } else if (prevPlayers) {
               // Check for capture animation (fast slide back to base)

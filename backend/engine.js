@@ -138,7 +138,7 @@ class LudoEngine {
           token.status = 'homestretch';
           token.position = 100 + homeStretchPos;
           this.lastAction = `${this.activePlayer.name} entered the home stretch.`;
-          this.animationDuration = (this.diceRoll + 1) * 250;
+          this.animationDuration = (this.diceRoll + 1) * 120 + 300;
         }
       } else {
         // Moving on main track
@@ -161,7 +161,7 @@ class LudoEngine {
           if (safeZones.includes(token.position)) {
             this.lastAction = `${this.activePlayer.name} landed on a safe zone!`;
           }
-          this.animationDuration = (this.diceRoll + 1) * 250; // 250ms per step
+          this.animationDuration = (this.diceRoll + 1) * 120 + 300; // 120ms per step + buffer
         }
       }
     } else if (token.status === 'homestretch') {
