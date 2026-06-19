@@ -121,9 +121,7 @@ class LudoEngine {
       token.status = 'main';
       token.position = startPos;
       this.lastAction = `${this.activePlayer.name} unlocked a token!`;
-      this.state = 'animating';
       this.animationDuration = 500; // Quick unlock animation
-      return true;
     } else if (token.status === 'main') {
       let traveled = token.position >= startPos ? (token.position - startPos) : (this.mainTrackLength - startPos + token.position);
       
