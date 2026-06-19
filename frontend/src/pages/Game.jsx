@@ -61,14 +61,14 @@ const Game = () => {
   const { roomId } = useParams();
   const navigate = useNavigate();
   const [roomData, setRoomData] = useState(null);
+  const localPlayerId = localStorage.getItem('ludo_player_id');
   
   const [rollTrigger, setRollTrigger] = useState(0);
   const [prevAction, setPrevAction] = useState('');
 
   useEffect(() => {
     // Request current state when loading the game page
-    const playerId = localStorage.getItem('ludo_player_id');
-    socket.emit('get_room_state', { roomId, playerId });
+    socket.emit('get_room_state', { roomId, playerId: localPlayerId });
 
     socket.on('room_update', (data) => {
       setRoomData(data);
