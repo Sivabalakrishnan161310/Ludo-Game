@@ -2,8 +2,10 @@ import React, { useEffect, useLayoutEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { playSteps, playSound } from '../utils/audio';
 
-// Classic 4-Player Ludo Colors matching the NEW image exactly
-const colors = ['#ef4444', '#3b82f6', '#facc15', '#22c55e']; // Vibrant Red, Blue, Yellow, Green
+// Ludo King exact board colors
+const colors = ['#EB1C24', '#22409A', '#FFE013', '#02A04B']; // Red, Blue, Yellow, Green
+const colorsLight = ['#FF6B6B', '#5B7FCC', '#FFF06B', '#4CD97B']; // Lighter variants for gradients
+const colorsDark = ['#B01018', '#172E6E', '#CCB00F', '#017A38']; // Darker variants for gradients
 
 function usePrevious(value) {
   const ref = useRef();
@@ -265,7 +267,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
 
       cells.push(
         <g key={`track-${i}`}>
-          <rect x={c * cellSize} y={r * cellSize} width={cellSize} height={cellSize} fill={fill} stroke="#1e293b" strokeWidth="2" />
+          <rect x={c * cellSize} y={r * cellSize} width={cellSize} height={cellSize} fill={fill} stroke="#555" strokeWidth="1" />
           {content}
         </g>
       );
@@ -278,7 +280,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
     homeStretches.forEach((stretch, colorIndex) => {
       stretch.forEach(([r, c]) => {
         stretches.push(
-          <rect key={`home-${colorIndex}-${r}-${c}`} x={c * cellSize} y={r * cellSize} width={cellSize} height={cellSize} fill={colors[colorIndex]} stroke="#1e293b" strokeWidth="2" />
+          <rect key={`home-${colorIndex}-${r}-${c}`} x={c * cellSize} y={r * cellSize} width={cellSize} height={cellSize} fill={colors[colorIndex]} stroke="#555" strokeWidth="1" />
         );
       });
     });
@@ -296,14 +298,16 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
     return bases.map((b, i) => (
       <g key={`base-${i}`}>
         {/* Outer colored rect */}
-        <rect x={b.c * cellSize} y={b.r * cellSize} width={cellSize * 6} height={cellSize * 6} fill={b.color} stroke="black" strokeWidth="2" />
+        <rect x={b.c * cellSize} y={b.r * cellSize} width={cellSize * 6} height={cellSize * 6} fill={b.color} stroke="#333" strokeWidth="2" rx="4" />
         {/* Inner white rect */}
-        <rect x={b.c * cellSize + cellSize} y={b.r * cellSize + cellSize} width={cellSize * 4} height={cellSize * 4} fill="white" />
-        {/* 4 Circles (Sized exactly to match the tokens) */}
-        <circle cx={b.c * cellSize + cellSize * 2} cy={b.r * cellSize + cellSize * 2} r={16} fill="#e2e8f0" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
-        <circle cx={b.c * cellSize + cellSize * 4} cy={b.r * cellSize + cellSize * 2} r={16} fill="#e2e8f0" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
-        <circle cx={b.c * cellSize + cellSize * 2} cy={b.r * cellSize + cellSize * 4} r={16} fill="#e2e8f0" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
-        <circle cx={b.c * cellSize + cellSize * 4} cy={b.r * cellSize + cellSize * 4} r={16} fill="#e2e8f0" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
+        <rect x={b.c * cellSize + cellSize * 0.8} y={b.r * cellSize + cellSize * 0.8} width={cellSize * 4.4} height={cellSize * 4.4} fill="white" rx="8" />
+        {/* 4 Token Slots with colored rings */}
+        {[[2, 2], [4, 2], [2, 4], [4, 4]].map(([cx, cy], j) => (
+          <g key={`slot-${i}-${j}`}>
+            <circle cx={b.c * cellSize + cellSize * cx} cy={b.r * cellSize + cellSize * cy} r={16} fill="#f0f0f0" />
+            <circle cx={b.c * cellSize + cellSize * cx} cy={b.r * cellSize + cellSize * cy} r={16} fill="none" stroke={b.color} strokeWidth="2" opacity="0.5" />
+          </g>
+        ))}
       </g>
     ));
   };
@@ -311,10 +315,10 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
   const renderCenterTriangles = () => {
     return (
       <g>
-        <polygon points={`${6*cellSize},${6*cellSize} ${6*cellSize},${9*cellSize} ${7.5*cellSize},${7.5*cellSize}`} fill={colors[0]} stroke="black" />
-        <polygon points={`${6*cellSize},${6*cellSize} ${9*cellSize},${6*cellSize} ${7.5*cellSize},${7.5*cellSize}`} fill={colors[1]} stroke="black" />
-        <polygon points={`${9*cellSize},${6*cellSize} ${9*cellSize},${9*cellSize} ${7.5*cellSize},${7.5*cellSize}`} fill={colors[2]} stroke="black" />
-        <polygon points={`${6*cellSize},${9*cellSize} ${9*cellSize},${9*cellSize} ${7.5*cellSize},${7.5*cellSize}`} fill={colors[3]} stroke="black" />
+        <polygon points={`${6*cellSize},${6*cellSize} ${6*cellSize},${9*cellSize} ${7.5*cellSize},${7.5*cellSize}`} fill={colors[0]} stroke="#333" strokeWidth="1" />
+        <polygon points={`${6*cellSize},${6*cellSize} ${9*cellSize},${6*cellSize} ${7.5*cellSize},${7.5*cellSize}`} fill={colors[1]} stroke="#333" strokeWidth="1" />
+        <polygon points={`${9*cellSize},${6*cellSize} ${9*cellSize},${9*cellSize} ${7.5*cellSize},${7.5*cellSize}`} fill={colors[2]} stroke="#333" strokeWidth="1" />
+        <polygon points={`${6*cellSize},${9*cellSize} ${9*cellSize},${9*cellSize} ${7.5*cellSize},${7.5*cellSize}`} fill={colors[3]} stroke="#333" strokeWidth="1" />
       </g>
     );
   };
@@ -358,9 +362,17 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
         preserveAspectRatio="xMidYMid meet"
       >
         <defs>
-          <filter id="classicCoinShadow" x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="2" dy="4" stdDeviation="2" floodOpacity="0.8" />
+          <filter id="classicCoinShadow" x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="1" dy="3" stdDeviation="2" floodColor="#000" floodOpacity="0.6" />
           </filter>
+          {/* Radial gradients for each player color — Ludo King glossy pawn look */}
+          {colors.map((color, i) => (
+            <radialGradient key={`coinGrad-${i}`} id={`coinGrad-${i}`} cx="35%" cy="30%" r="65%">
+              <stop offset="0%" stopColor={colorsLight[i]} />
+              <stop offset="70%" stopColor={color} />
+              <stop offset="100%" stopColor={colorsDark[i]} />
+            </radialGradient>
+          ))}
         </defs>
 
         {renderBases()}
@@ -369,7 +381,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
         {renderCenterTriangles()}
 
         {/* Outline for the whole board */}
-        <rect x="0" y="0" width={boardSize} height={boardSize} fill="none" stroke="black" strokeWidth="4" />
+        <rect x="0" y="0" width={boardSize} height={boardSize} fill="none" stroke="#333" strokeWidth="3" />
 
         {/* Render Tokens */}
         {(() => {
@@ -478,13 +490,24 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
                 style={{ cursor: isHighlight ? 'pointer' : 'default' }}
                 onClick={() => onTokenClick && onTokenClick(token.id)}
               >
-                {/* 3D Coin look */}
-                <circle cx={0} cy={0} r={14} fill={colors[pColorIndex]} filter="url(#classicCoinShadow)" stroke="white" strokeWidth="2" />
-                <circle cx={0} cy={0} r={8} fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" />
+                {/* Ludo King 3D Pawn Style */}
+                {/* Drop shadow base */}
+                <ellipse cx={1} cy={3} rx={12} ry={6} fill="rgba(0,0,0,0.25)" />
+                {/* Main coin body with radial gradient */}
+                <circle cx={0} cy={0} r={14} fill={`url(#coinGrad-${pColorIndex})`} filter="url(#classicCoinShadow)" />
+                {/* Outer ring */}
+                <circle cx={0} cy={0} r={13} fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" />
+                {/* Inner circle accent (the recessed inlay look) */}
+                <circle cx={0} cy={0} r={8} fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" />
+                {/* Glossy highlight - top-left specular */}
+                <ellipse cx={-3} cy={-4} rx={5} ry={4} fill="rgba(255,255,255,0.35)" />
                 
                 {/* Extra glowing ring if highlighted */}
                 {isHighlight && (
-                  <circle cx={0} cy={0} r={18} fill="none" stroke="white" strokeWidth="2" strokeDasharray="4 4" opacity="0.8" />
+                  <>
+                    <circle cx={0} cy={0} r={17} fill="none" stroke="white" strokeWidth="2" strokeDasharray="4 4" opacity="0.9" />
+                    <circle cx={0} cy={0} r={17} fill="none" stroke={colors[pColorIndex]} strokeWidth="1" opacity="0.5" />
+                  </>
                 )}
               </motion.g>
             );
