@@ -241,7 +241,6 @@ const Game = () => {
         <h1 style={{ margin: 0, fontSize: '2rem', background: 'linear-gradient(to right, #a855f7, #ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
           Room: {roomId}
         </h1>
-        <p style={{ margin: '0.5rem 0 0 0', color: '#94a3b8', fontSize: '1.2rem', minHeight: '1.5rem' }}>{gameState.lastAction}</p>
       </div>
 
       {/* Main Layout */}
