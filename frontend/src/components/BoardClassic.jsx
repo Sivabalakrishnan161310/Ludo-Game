@@ -248,7 +248,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
     const cells = [];
     for (let i = 0; i < 52; i++) {
       const [r, c] = track[i];
-      let fill = 'white';
+      let fill = '#FFFFFF';
       let content = null;
       
       // Stars and Safe Zones logic matching Ludo King
@@ -272,7 +272,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
 
       cells.push(
         <g key={`track-${i}`}>
-          <rect x={c * cellSize} y={r * cellSize} width={cellSize} height={cellSize} fill={fill} stroke="#555" strokeWidth="1" />
+          <rect x={c * cellSize} y={r * cellSize} width={cellSize} height={cellSize} fill={fill} stroke="#D1D3D4" strokeWidth="1" />
           {content}
         </g>
       );
@@ -285,7 +285,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
     homeStretches.forEach((stretch, colorIndex) => {
       stretch.forEach(([r, c]) => {
         stretches.push(
-          <rect key={`home-${colorIndex}-${r}-${c}`} x={c * cellSize} y={r * cellSize} width={cellSize} height={cellSize} fill={colors[colorIndex]} stroke="#555" strokeWidth="1" />
+          <rect key={`home-${colorIndex}-${r}-${c}`} x={c * cellSize} y={r * cellSize} width={cellSize} height={cellSize} fill={colors[colorIndex]} stroke="#D1D3D4" strokeWidth="1" />
         );
       });
     });
@@ -303,7 +303,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
     return bases.map((b, i) => (
       <g key={`base-${i}`}>
         {/* Outer colored rect */}
-        <rect x={b.c * cellSize} y={b.r * cellSize} width={cellSize * 6} height={cellSize * 6} fill={b.color} stroke="#333" strokeWidth="2" rx="4" />
+        <rect x={b.c * cellSize} y={b.r * cellSize} width={cellSize * 6} height={cellSize * 6} fill={b.color} stroke="#D1D3D4" strokeWidth="2" rx="4" />
         {/* Inner white rect */}
         <rect x={b.c * cellSize + cellSize * 0.8} y={b.r * cellSize + cellSize * 0.8} width={cellSize * 4.4} height={cellSize * 4.4} fill="white" rx="8" />
         {/* 4 Token Slots with colored rings */}
@@ -320,10 +320,10 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
   const renderCenterTriangles = () => {
     return (
       <g>
-        <polygon points={`${6*cellSize},${6*cellSize} ${6*cellSize},${9*cellSize} ${7.5*cellSize},${7.5*cellSize}`} fill={colors[0]} stroke="#333" strokeWidth="1" />
-        <polygon points={`${6*cellSize},${6*cellSize} ${9*cellSize},${6*cellSize} ${7.5*cellSize},${7.5*cellSize}`} fill={colors[1]} stroke="#333" strokeWidth="1" />
-        <polygon points={`${9*cellSize},${6*cellSize} ${9*cellSize},${9*cellSize} ${7.5*cellSize},${7.5*cellSize}`} fill={colors[2]} stroke="#333" strokeWidth="1" />
-        <polygon points={`${6*cellSize},${9*cellSize} ${9*cellSize},${9*cellSize} ${7.5*cellSize},${7.5*cellSize}`} fill={colors[3]} stroke="#333" strokeWidth="1" />
+        <polygon points={`${6*cellSize},${6*cellSize} ${6*cellSize},${9*cellSize} ${7.5*cellSize},${7.5*cellSize}`} fill={colors[0]} stroke="#D1D3D4" strokeWidth="1" />
+        <polygon points={`${6*cellSize},${6*cellSize} ${9*cellSize},${6*cellSize} ${7.5*cellSize},${7.5*cellSize}`} fill={colors[1]} stroke="#D1D3D4" strokeWidth="1" />
+        <polygon points={`${9*cellSize},${6*cellSize} ${9*cellSize},${9*cellSize} ${7.5*cellSize},${7.5*cellSize}`} fill={colors[2]} stroke="#D1D3D4" strokeWidth="1" />
+        <polygon points={`${6*cellSize},${9*cellSize} ${9*cellSize},${9*cellSize} ${7.5*cellSize},${7.5*cellSize}`} fill={colors[3]} stroke="#D1D3D4" strokeWidth="1" />
       </g>
     );
   };
@@ -359,7 +359,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
           width: '100%', height: '100%',
           transform: `rotate(${boardRotation}deg)`, 
           transition: 'transform 1s ease-in-out',
-          background: 'white',
+          background: '#FFFFFF',
           borderRadius: '12px',
           boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
         }} 
@@ -386,7 +386,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
         {renderCenterTriangles()}
 
         {/* Outline for the whole board */}
-        <rect x="0" y="0" width={boardSize} height={boardSize} fill="none" stroke="#333" strokeWidth="3" />
+        <rect x="0" y="0" width={boardSize} height={boardSize} fill="none" stroke="#5C3A21" strokeWidth="8" rx="4" />
 
         {/* Render Tokens */}
         {(() => {
