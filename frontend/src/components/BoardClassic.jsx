@@ -243,7 +243,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
     const cells = [];
     for (let i = 0; i < 52; i++) {
       const [r, c] = track[i];
-      let fill = 'white';
+      let fill = '#FFF8E7';  // Cream to match board
       let content = null;
       
       // Stars and Safe Zones logic matching Ludo King
@@ -354,7 +354,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
           width: '100%', height: '100%',
           transform: `rotate(${boardRotation}deg)`, 
           transition: 'transform 1s ease-in-out',
-          background: 'white',
+          background: '#FFF8E7',
           borderRadius: '12px',
           boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
         }} 
@@ -474,9 +474,23 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
               }
             }
 
+            // Hop arc: animate inner group up then down for each step
+            let innerAnimate = { y: 0, scale: 1 };
+            let innerTransition = { duration: 0.05 };
+
+            if (stepPos) {
+              // During a step, do a quick arc: jump up then land
+              innerAnimate = { y: [0, -18, 0], scale: [1, 1.15, 1] };
+              innerTransition = { 
+                duration: 0.12, 
+                ease: "easeOut",
+                times: [0, 0.4, 1]
+              };
+            }
+
             if (isHighlight) {
-               animateProps.scale = [1, 1.25, 1];
-               transitionProps.scale = { repeat: Infinity, duration: 1, ease: "easeInOut" };
+               animateProps.scale = [1, 1.15, 1];
+               transitionProps.scale = { repeat: Infinity, duration: 0.8, ease: "easeInOut" };
             } else if (!animateProps.scale) {
                animateProps.scale = 1;
             }
@@ -490,23 +504,37 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
                 style={{ cursor: isHighlight ? 'pointer' : 'default' }}
                 onClick={() => onTokenClick && onTokenClick(token.id)}
               >
-                {/* Ludo King 3D Pawn Style */}
-                {/* Drop shadow base */}
-                <ellipse cx={1} cy={3} rx={12} ry={6} fill="rgba(0,0,0,0.25)" />
-                {/* Main coin body with radial gradient */}
-                <circle cx={0} cy={0} r={14} fill={`url(#coinGrad-${pColorIndex})`} filter="url(#classicCoinShadow)" />
-                {/* Outer ring */}
-                <circle cx={0} cy={0} r={13} fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" />
-                {/* Inner circle accent (the recessed inlay look) */}
-                <circle cx={0} cy={0} r={8} fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" />
-                {/* Glossy highlight - top-left specular */}
-                <ellipse cx={-3} cy={-4} rx={5} ry={4} fill="rgba(255,255,255,0.35)" />
+                {/* Ground shadow (stays flat on board) */}
+                <ellipse cx={0} cy={10} rx={10} ry={4} fill="rgba(0,0,0,0.3)" />
+
+                {/* Inner group that hops up during movement */}
+                <motion.g
+                  animate={innerAnimate}
+                  transition={innerTransition}
+                  key={stepPos ? `hop-${stepPos.x}-${stepPos.y}` : 'idle'}
+                >
+                  {/* === LUDO KING PAWN SHAPE === */}
+                  {/* Pawn body (tapered cylinder) */}
+                  <path
+                    d="M -8,8 Q -10,4 -7,-2 Q -5,-6 -6,-8 Q -4,-12 0,-14 Q 4,-12 6,-8 Q 5,-6 7,-2 Q 10,4 8,8 Z"
+                    fill={`url(#coinGrad-${pColorIndex})`}
+                    stroke={colorsDark[pColorIndex]}
+                    strokeWidth="1"
+                  />
+                  {/* Pawn head (glossy sphere on top) */}
+                  <circle cx={0} cy={-10} r={6} fill={`url(#coinGrad-${pColorIndex})`} stroke={colorsDark[pColorIndex]} strokeWidth="0.8" />
+                  {/* Head glossy highlight */}
+                  <ellipse cx={-2} cy={-12} rx={3} ry={2.5} fill="rgba(255,255,255,0.45)" />
+                  {/* Body glossy highlight */}
+                  <ellipse cx={-2} cy={-2} rx={3} ry={5} fill="rgba(255,255,255,0.2)" />
+                  {/* Base rim */}
+                  <ellipse cx={0} cy={8} rx={8} ry={2.5} fill={colorsDark[pColorIndex]} opacity="0.5" />
+                </motion.g>
                 
                 {/* Extra glowing ring if highlighted */}
                 {isHighlight && (
                   <>
-                    <circle cx={0} cy={0} r={17} fill="none" stroke="white" strokeWidth="2" strokeDasharray="4 4" opacity="0.9" />
-                    <circle cx={0} cy={0} r={17} fill="none" stroke={colors[pColorIndex]} strokeWidth="1" opacity="0.5" />
+                    <circle cx={0} cy={-2} r={18} fill="none" stroke="white" strokeWidth="2" strokeDasharray="4 4" opacity="0.9" />
                   </>
                 )}
               </motion.g>
