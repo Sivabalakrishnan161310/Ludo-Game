@@ -278,7 +278,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
 
       cells.push(
         <g key={`track-${i}`}>
-          <rect x={c * cellSize} y={r * cellSize} width={cellSize} height={cellSize} fill={fill} stroke="#D1D3D4" strokeWidth="1" />
+          <rect x={c * cellSize} y={r * cellSize} width={cellSize} height={cellSize} fill={fill} stroke="#000" strokeWidth="1" />
           {content}
         </g>
       );
@@ -291,7 +291,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
     homeStretches.forEach((stretch, colorIndex) => {
       stretch.forEach(([r, c]) => {
         stretches.push(
-          <rect key={`home-${colorIndex}-${r}-${c}`} x={c * cellSize} y={r * cellSize} width={cellSize} height={cellSize} fill={colors[colorIndex]} stroke="#D1D3D4" strokeWidth="1" />
+          <rect key={`home-${colorIndex}-${r}-${c}`} x={c * cellSize} y={r * cellSize} width={cellSize} height={cellSize} fill={colors[colorIndex]} stroke="#000" strokeWidth="1" />
         );
       });
     });
@@ -309,14 +309,13 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
     return bases.map((b, i) => (
       <g key={`base-${i}`}>
         {/* Outer colored rect */}
-        <rect x={b.c * cellSize} y={b.r * cellSize} width={cellSize * 6} height={cellSize * 6} fill={b.color} stroke="#D1D3D4" strokeWidth="2" rx="4" />
+        <rect x={b.c * cellSize} y={b.r * cellSize} width={cellSize * 6} height={cellSize * 6} fill={b.color} stroke="#000" strokeWidth="2" rx="4" />
         {/* Inner white rect */}
         <rect x={b.c * cellSize + cellSize * 0.8} y={b.r * cellSize + cellSize * 0.8} width={cellSize * 4.4} height={cellSize * 4.4} fill="white" rx="8" />
         {/* 4 Token Slots with colored rings */}
         {[[2, 2], [4, 2], [2, 4], [4, 4]].map(([cx, cy], j) => (
           <g key={`slot-${i}-${j}`}>
-            <circle cx={b.c * cellSize + cellSize * cx} cy={b.r * cellSize + cellSize * cy} r={16} fill="#f0f0f0" />
-            <circle cx={b.c * cellSize + cellSize * cx} cy={b.r * cellSize + cellSize * cy} r={16} fill="none" stroke={b.color} strokeWidth="2" opacity="0.5" />
+            <circle cx={b.c * cellSize + cellSize * cx} cy={b.r * cellSize + cellSize * cy} r={16} fill={b.color} stroke="#000" strokeWidth="1" />
           </g>
         ))}
       </g>
@@ -326,10 +325,10 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
   const renderCenterTriangles = () => {
     return (
       <g>
-        <polygon points={`${6*cellSize},${6*cellSize} ${6*cellSize},${9*cellSize} ${7.5*cellSize},${7.5*cellSize}`} fill={colors[0]} stroke="#D1D3D4" strokeWidth="1" />
-        <polygon points={`${6*cellSize},${6*cellSize} ${9*cellSize},${6*cellSize} ${7.5*cellSize},${7.5*cellSize}`} fill={colors[1]} stroke="#D1D3D4" strokeWidth="1" />
-        <polygon points={`${9*cellSize},${6*cellSize} ${9*cellSize},${9*cellSize} ${7.5*cellSize},${7.5*cellSize}`} fill={colors[2]} stroke="#D1D3D4" strokeWidth="1" />
-        <polygon points={`${6*cellSize},${9*cellSize} ${9*cellSize},${9*cellSize} ${7.5*cellSize},${7.5*cellSize}`} fill={colors[3]} stroke="#D1D3D4" strokeWidth="1" />
+        <polygon points={`${6*cellSize},${6*cellSize} ${6*cellSize},${9*cellSize} ${7.5*cellSize},${7.5*cellSize}`} fill={colors[0]} stroke="#000" strokeWidth="1" />
+        <polygon points={`${6*cellSize},${6*cellSize} ${9*cellSize},${6*cellSize} ${7.5*cellSize},${7.5*cellSize}`} fill={colors[1]} stroke="#000" strokeWidth="1" />
+        <polygon points={`${9*cellSize},${6*cellSize} ${9*cellSize},${9*cellSize} ${7.5*cellSize},${7.5*cellSize}`} fill={colors[2]} stroke="#000" strokeWidth="1" />
+        <polygon points={`${6*cellSize},${9*cellSize} ${9*cellSize},${9*cellSize} ${7.5*cellSize},${7.5*cellSize}`} fill={colors[3]} stroke="#000" strokeWidth="1" />
       </g>
     );
   };
