@@ -150,8 +150,8 @@ class LudoEngine {
         if (capturedDistance > 0) {
           getAnotherTurn = true;
           this.lastAction = `${this.activePlayer.name} captured an opponent's token!`;
-          // Sequence: Attacker hops (diceRoll * 200ms) + Victim slides back (capturedDistance * 50ms) + buffers
-          this.animationDuration = (this.diceRoll * 200) + (capturedDistance * 50) + 800; 
+          // Sequence: Attacker hops (diceRoll * 200ms) + Victim slides back (capturedDistance * 100ms) + buffers
+          this.animationDuration = (this.diceRoll * 200) + (capturedDistance * 100) + 600; 
         } else {
           // Check if landed on safe zone
           const safeZones = [];

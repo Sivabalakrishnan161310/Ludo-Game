@@ -205,10 +205,10 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
             animTimersRef.current[key] = [];
 
             // For captures, wait for the attacker to finish their move before sliding back
-            // Attacker takes (diceRoll * 200) ms. So we wait that long + 300ms buffer
-            const startDelay = isCapture ? (gameState.diceRoll * 200 + 300) : 0;
-            // Captures slide back much faster (50ms per tile)
-            const stepDelay = isCapture ? 50 : 200;
+            // Attacker takes (diceRoll * 200) ms.
+            const startDelay = isCapture ? (gameState.diceRoll * 200) : 0;
+            // Captures slide back at 100ms per tile (slightly slower than before for better visibility)
+            const stepDelay = isCapture ? 100 : 200;
 
             // Queue each step with a delay
             path.forEach((pos, idx) => {
