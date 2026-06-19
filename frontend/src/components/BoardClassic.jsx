@@ -379,8 +379,10 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
                   }
                }
             }
-            let animateProps = { x: finalX, y: finalY };
-            let transitionProps = { type: "spring", stiffness: 300, damping: 25 };
+            let outerAnimateProps = { x: finalX, y: finalY };
+            let outerTransitionProps = { type: "spring", stiffness: 300, damping: 25 };
+            let innerAnimateProps = { x: 0, y: 0, scale: 1 };
+            let innerTransitionProps = { duration: 0 };
 
             if (animData && animData.path && animData.path.length > 0) {
               const pathCoords = animData.path;
@@ -389,98 +391,104 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
 
               if (isCapture) {
                 // Smooth rapid slide back to base for captured tokens
-                animateProps = {
+                outerAnimateProps = {
                   x: [null, ...pathCoords.map(p => p.x), finalX],
                   y: [null, ...pathCoords.map(p => p.y), finalY]
                 };
                 const keyframesCount = N + 2;
                 const times = Array.from({ length: keyframesCount }).map((_, i) => i / (keyframesCount - 1));
                 const totalDuration = (N + 1) * 0.05;
-                transitionProps = {
+                outerTransitionProps = {
                   x: { duration: totalDuration, times, ease: "linear" },
                   y: { duration: totalDuration, times, ease: "linear" }
                 };
               } else {
-                // Box-by-box Hopping Animation!
-                const hopX = [animData.originX]; 
-                const hopY = [animData.originY];
-                const hopScale = [1];
-                const times = [0];
-                
-                let currentPx = animData.originX;
-                let currentPy = animData.originY;
-                
+                // FROG HOP ANIMATION: Outer group slides shadow, Inner group jumps coin
+                const outerX = [animData.originX];
+                const outerY = [animData.originY];
+                const outerTimes = [0];
+
+                const innerX = [0];
+                const innerY = [0];
+                const innerScale = [1];
+                const innerTimes = [0];
+
+                // Calculate vector pointing strictly "UP" on the user's screen
+                const theta = boardRotation * Math.PI / 180;
+                const upJumpX = -35 * Math.sin(theta);
+                const upJumpY = -35 * Math.cos(theta);
+
                 pathCoords.forEach((p, idx) => {
-                  const stepNumber = idx + 1;
-                  
-                  // 1. Prepare to jump
-                  hopX.push(currentPx);
-                  hopY.push(currentPy);
-                  hopScale.push(1);
-                  times.push((stepNumber - 0.8) / (N + 1));
-                  
-                  // 2. Midpoint (Peak of jump)
-                  hopX.push((currentPx + p.x) / 2);
-                  hopY.push((currentPy + p.y) / 2); // Can't safely subtract Y because board rotates
-                  hopScale.push(1.6); // Massive scale up for the hop illusion!
-                  times.push((stepNumber - 0.5) / (N + 1));
-                  
-                  // 3. Land exactly on the box
-                  hopX.push(p.x);
-                  hopY.push(p.y);
-                  hopScale.push(1);
-                  times.push((stepNumber - 0.1) / (N + 1)); // Arrive fast
-                  
-                  // 4. Rest on the box for a moment before next jump
-                  hopX.push(p.x);
-                  hopY.push(p.y);
-                  hopScale.push(1);
-                  times.push(stepNumber / (N + 1));
-                  
-                  currentPx = p.x;
-                  currentPy = p.y;
+                  const T_start = idx / (N + 1);
+                  const T_step = 1 / (N + 1);
+
+                  // Outer logic: Slides directly to next box, then rests.
+                  outerX.push(p.x, p.x);
+                  outerY.push(p.y, p.y);
+                  outerTimes.push(T_start + T_step * 0.7, T_start + T_step); // Slide takes 70%, rest takes 30%
+
+                  // Inner logic: Arc up into the air, land down, then rest.
+                  innerX.push(upJumpX, 0, 0);
+                  innerY.push(upJumpY, 0, 0);
+                  innerScale.push(1.6, 1, 1);
+                  innerTimes.push(T_start + T_step * 0.35, T_start + T_step * 0.7, T_start + T_step);
                 });
-                
-                // Final slide to offset position (if stacking with other tokens)
-                hopX.push(finalX);
-                hopY.push(finalY);
-                hopScale.push(1);
-                times.push(1);
-                
-                animateProps = { x: hopX, y: hopY, scale: hopScale };
-                const totalDuration = (N + 1) * 0.35; // 350ms per jump to see it clearly!
-                transitionProps = {
-                  x: { duration: totalDuration, times, ease: "linear" },
-                  y: { duration: totalDuration, times, ease: "linear" },
-                  scale: { duration: totalDuration, times, ease: "linear" }
+
+                // Final offset slide (stacking)
+                outerX.push(finalX);
+                outerY.push(finalY);
+                outerTimes.push(1.0);
+
+                innerX.push(0);
+                innerY.push(0);
+                innerScale.push(1);
+                innerTimes.push(1.0);
+
+                outerAnimateProps = { x: outerX, y: outerY };
+                outerTransitionProps = {
+                  duration: (N + 1) * 0.35,
+                  times: outerTimes,
+                  ease: "linear"
+                };
+
+                innerAnimateProps = { x: innerX, y: innerY, scale: innerScale };
+                innerTransitionProps = {
+                  duration: (N + 1) * 0.35,
+                  times: innerTimes,
+                  ease: "linear"
                 };
               }
             }
 
             if (isHighlight) {
-               animateProps.scale = [1, 1.25, 1];
-               transitionProps.scale = { repeat: Infinity, duration: 1, ease: "easeInOut" };
-            } else if (!animateProps.scale) {
-               animateProps.scale = 1;
+               innerAnimateProps.scale = [1, 1.25, 1];
+               innerTransitionProps.scale = { repeat: Infinity, duration: 1, ease: "easeInOut" };
+            } else if (!innerAnimateProps.scale) {
+               innerAnimateProps.scale = 1;
             }
             
             return (
               <motion.g
                 key={`token-${player.id}-${token.id}`}
                 initial={false}
-                animate={animateProps}
-                transition={transitionProps}
+                animate={outerAnimateProps}
+                transition={outerTransitionProps}
                 style={{ cursor: isHighlight ? 'pointer' : 'default' }}
                 onClick={() => onTokenClick && onTokenClick(token.id)}
               >
-                {/* 3D Coin look */}
-                <circle cx={0} cy={0} r={14} fill={colors[pColorIndex]} filter="url(#classicCoinShadow)" stroke="white" strokeWidth="2" />
-                <circle cx={0} cy={0} r={8} fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" />
-                
-                {/* Extra glowing ring if highlighted */}
-                {isHighlight && (
-                  <circle cx={0} cy={0} r={18} fill="none" stroke="white" strokeWidth="2" strokeDasharray="4 4" opacity="0.8" />
-                )}
+                {/* 1. GROUND SHADOW (Stays flat on the board and slides square by square) */}
+                <circle cx={0} cy={0} r={14} fill="rgba(0,0,0,0.5)" filter="blur(3px)" transform="translate(4, 6)" />
+
+                {/* 2. PHYSICAL COIN (Jumps into the air away from the shadow!) */}
+                <motion.g animate={innerAnimateProps} transition={innerTransitionProps}>
+                  <circle cx={0} cy={0} r={14} fill={colors[pColorIndex]} stroke="white" strokeWidth="2" />
+                  <circle cx={0} cy={0} r={8} fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" />
+                  
+                  {/* Extra glowing ring if highlighted */}
+                  {isHighlight && (
+                    <circle cx={0} cy={0} r={18} fill="none" stroke="white" strokeWidth="2" strokeDasharray="4 4" opacity="0.8" />
+                  )}
+                </motion.g>
               </motion.g>
             );
           });
