@@ -401,16 +401,58 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
                   y: { duration: totalDuration, times, ease: "linear" }
                 };
               } else {
-                // Single Jumping Animation directly to destination
-                animateProps = {
-                  x: [animData.originX, (animData.originX + finalX) / 2, finalX],
-                  y: [animData.originY, (animData.originY + finalY) / 2 - 30, finalY], // Arc upwards by 30px
-                  scale: [1, 1.5, 1]
-                };
+                // Box-by-box Hopping Animation!
+                const hopX = [animData.originX]; 
+                const hopY = [animData.originY];
+                const hopScale = [1];
+                const times = [0];
+                
+                let currentPx = animData.originX;
+                let currentPy = animData.originY;
+                
+                pathCoords.forEach((p, idx) => {
+                  const stepNumber = idx + 1;
+                  
+                  // 1. Prepare to jump
+                  hopX.push(currentPx);
+                  hopY.push(currentPy);
+                  hopScale.push(1);
+                  times.push((stepNumber - 0.8) / (N + 1));
+                  
+                  // 2. Midpoint (Peak of jump)
+                  hopX.push((currentPx + p.x) / 2);
+                  hopY.push((currentPy + p.y) / 2); // Can't safely subtract Y because board rotates
+                  hopScale.push(1.6); // Massive scale up for the hop illusion!
+                  times.push((stepNumber - 0.5) / (N + 1));
+                  
+                  // 3. Land exactly on the box
+                  hopX.push(p.x);
+                  hopY.push(p.y);
+                  hopScale.push(1);
+                  times.push((stepNumber - 0.1) / (N + 1)); // Arrive fast
+                  
+                  // 4. Rest on the box for a moment before next jump
+                  hopX.push(p.x);
+                  hopY.push(p.y);
+                  hopScale.push(1);
+                  times.push(stepNumber / (N + 1));
+                  
+                  currentPx = p.x;
+                  currentPy = p.y;
+                });
+                
+                // Final slide to offset position (if stacking with other tokens)
+                hopX.push(finalX);
+                hopY.push(finalY);
+                hopScale.push(1);
+                times.push(1);
+                
+                animateProps = { x: hopX, y: hopY, scale: hopScale };
+                const totalDuration = (N + 1) * 0.35; // 350ms per jump to see it clearly!
                 transitionProps = {
-                  duration: 0.5,
-                  times: [0, 0.5, 1],
-                  ease: "easeInOut"
+                  x: { duration: totalDuration, times, ease: "easeInOut" },
+                  y: { duration: totalDuration, times, ease: "easeInOut" },
+                  scale: { duration: totalDuration, times, ease: "easeInOut" }
                 };
               }
             }
