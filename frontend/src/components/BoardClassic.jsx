@@ -450,9 +450,9 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
                 animateProps = { x: hopX, y: hopY, scale: hopScale };
                 const totalDuration = (N + 1) * 0.35; // 350ms per jump to see it clearly!
                 transitionProps = {
-                  x: { duration: totalDuration, times, ease: "easeInOut" },
-                  y: { duration: totalDuration, times, ease: "easeInOut" },
-                  scale: { duration: totalDuration, times, ease: "easeInOut" }
+                  x: { duration: totalDuration, times, ease: "linear" },
+                  y: { duration: totalDuration, times, ease: "linear" },
+                  scale: { duration: totalDuration, times, ease: "linear" }
                 };
               }
             }
