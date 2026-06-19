@@ -146,11 +146,12 @@ class LudoEngine {
         this.lastAction = `${this.activePlayer.name} moved a token.`;
 
         // Check for captures
-        const captured = this.checkCapture(token.position, this.activePlayer.colorIndex);
-        if (captured) {
+        const capturedDistance = this.checkCapture(token.position, this.activePlayer.colorIndex);
+        if (capturedDistance > 0) {
           getAnotherTurn = true;
           this.lastAction = `${this.activePlayer.name} captured an opponent's token!`;
-          this.animationDuration = 2500; // Longer delay to allow victim slide-back
+          // Sequence: Attacker hops (diceRoll * 200ms) + Victim slides back (capturedDistance * 50ms) + buffers
+          this.animationDuration = (this.diceRoll * 200) + (capturedDistance * 50) + 800; 
         } else {
           // Check if landed on safe zone
           const safeZones = [];
@@ -236,27 +237,30 @@ class LudoEngine {
   }
 
   checkCapture(pos, myColorIndex) {
-    // Safe zones: Start squares and Star squares (8 steps ahead) for all N players
-    const safeZones = [];
-    for (let i = 0; i < this.N; i++) {
-      safeZones.push(i * 13 + 8);
-      safeZones.push((i * 13 + 16) % this.mainTrackLength);
+    // Cannot capture on safe zones
+    const greyStarIndices = [3, 16, 29, 42];
+    const startIndices = [8, 21, 34, 47];
+    if (greyStarIndices.includes(pos) || startIndices.includes(pos)) {
+      return 0; // Return 0 distance = no capture
     }
-    if (safeZones.includes(pos)) return false;
 
-    let captured = false;
-    for (let p of this.players) {
-      if (p.colorIndex !== myColorIndex) {
-        for (let t of p.tokens) {
-          if (t.status === 'main' && t.position === pos) {
-            t.status = 'base';
-            t.position = -1;
-            captured = true;
+    let capturedDistance = 0;
+    for (let player of this.players) {
+      if (player.colorIndex !== myColorIndex) {
+        for (let token of player.tokens) {
+          if (token.status === 'main' && token.position === pos) {
+            token.status = 'base';
+            token.position = -1;
+            
+            // Calculate reverse distance back to base for timing
+            const victimStartPos = player.colorIndex * 13 + 8;
+            let currentPos = pos;
+            capturedDistance = currentPos >= victimStartPos ? (currentPos - victimStartPos) : (currentPos + 52 - victimStartPos);
           }
         }
       }
     }
-    return captured;
+    return capturedDistance;
   }
 
   nextTurn() {

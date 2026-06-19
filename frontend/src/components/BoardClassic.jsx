@@ -193,8 +193,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
 
         if (prevToken.status !== token.status || prevToken.position !== token.position) {
           const isCapture = prevToken.status === 'main' && token.status === 'base';
-          if (isCapture) return; // Captures use the fast slide-back, not hopping
-
+          
           const path = calculatePath(pColorIndex, prevToken, token);
           if (path && path.length > 0) {
             const key = `${player.id}-${token.id}`;
@@ -204,6 +203,12 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
               animTimersRef.current[key].forEach(clearTimeout);
             }
             animTimersRef.current[key] = [];
+
+            // For captures, wait for the attacker to finish their move before sliding back
+            // Attacker takes (diceRoll * 200) ms. So we wait that long + 300ms buffer
+            const startDelay = isCapture ? (gameState.diceRoll * 200 + 300) : 0;
+            // Captures slide back much faster (50ms per tile)
+            const stepDelay = isCapture ? 50 : 200;
 
             // Queue each step with a delay
             path.forEach((pos, idx) => {
@@ -221,7 +226,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
                   }, 250); // Wait for hop to settle
                   animTimersRef.current[key].push(cleanup);
                 }
-              }, idx * 200); // 200ms per tile
+              }, startDelay + (idx * stepDelay));
               animTimersRef.current[key].push(timer);
             });
           }
@@ -450,28 +455,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
                 ease: "easeOut"
               };
             } else if (prevPlayers) {
-              // Check for capture animation (fast slide back to base)
-              const prevPlayer = prevPlayers.find(p => p.id === player.id);
-              if (prevPlayer) {
-                const prevToken = prevPlayer.tokens.find(t => t.id === token.id);
-                if (prevToken && prevToken.status === 'main' && token.status === 'base') {
-                  const path = calculatePath(pColorIndex, prevToken, token);
-                  if (path && path.length > 0) {
-                    const N = path.length;
-                    animateProps = {
-                      x: [null, ...path.map(p => p.x), finalX],
-                      y: [null, ...path.map(p => p.y), finalY]
-                    };
-                    const keyframesCount = N + 2;
-                    const times = Array.from({ length: keyframesCount }).map((_, i) => i / (keyframesCount - 1));
-                    const totalDuration = (N + 1) * 0.05;
-                    transitionProps = {
-                      x: { duration: totalDuration, times, ease: "linear" },
-                      y: { duration: totalDuration, times, ease: "linear" }
-                    };
-                  }
-                }
-              }
+              // We rely on the unified tokenAnimPos system for captures now. No manual keyframes.
             }
 
             // Hop arc: animate inner group up then down for each step
