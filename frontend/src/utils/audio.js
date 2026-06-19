@@ -1,6 +1,6 @@
 const audioCache = {};
 const soundsList = [
-  'dice_roll', 'token_step', 'token_kill', 'safe_zone', 
+  'dice_roll', 'token_step', 'token_kill', 'safe_zone',
   'token_home', 'dude_oorum_blood', 'token_unlock'
 ];
 
@@ -46,7 +46,7 @@ export const playSound = (soundName) => {
   try {
     initAudioContext();
     const cached = audioCache[soundName];
-    
+
     // Resume AudioContext if it was suspended (browser autoplay policy)
     if (audioCtx && audioCtx.state === 'suspended') {
       audioCtx.resume();
@@ -81,12 +81,12 @@ export const playSteps = (stepsCount, durationPerStepMs = 200, finalSound = null
   }
 
   const now = audioCtx ? audioCtx.currentTime : 0;
-  
+
   for (let i = 1; i <= stepsCount; i++) {
     const isLast = i === stepsCount;
     const soundName = (isLast && finalSound) ? finalSound : 'token_step';
     const delaySecs = (i * durationPerStepMs) / 1000.0;
-    
+
     if (audioCtx && audioCache[soundName] instanceof AudioBuffer) {
       // Schedule exactly on the hardware clock
       const source = audioCtx.createBufferSource();

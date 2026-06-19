@@ -210,6 +210,12 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
             // Captures slide back at 100ms per tile (slightly slower than before for better visibility)
             const stepDelay = isCapture ? 100 : 200;
 
+            // If there's a start delay (like a capture), lock the token at its original position immediately
+            // so it doesn't snap to the base while waiting for the attacker to finish.
+            if (startDelay > 0) {
+              setTokenAnimPos(prev => ({ ...prev, [key]: getTokenPosition(pColorIndex, prevToken) }));
+            }
+
             // Queue each step with a delay
             path.forEach((pos, idx) => {
               const timer = setTimeout(() => {
