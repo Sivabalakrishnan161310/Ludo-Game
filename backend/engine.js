@@ -33,7 +33,7 @@ class LudoEngine {
     this.diceRoll = crypto.randomInt(1, 7); // Start with a random face instead of defaulting to 1
     this.consecutiveSixes = 0;
     this.state = 'waiting_for_roll'; // waiting_for_roll, waiting_for_move, finished
-    this.turnDeadline = Date.now() + 15000; // 15 seconds timer
+    this.turnDeadline = Date.now() + 45000; // 45 seconds timer
     this.lastAction = 'Game Started! Roll the dice.';
   }
 
@@ -68,7 +68,7 @@ class LudoEngine {
     } else {
       this.lastAction = `${this.activePlayer.name} rolled a ${this.diceRoll}.`;
       this.state = 'waiting_for_move';
-      this.turnDeadline = Date.now() + 15000; // Reset timer for move
+      this.turnDeadline = Date.now() + 45000; // Reset timer for move
     }
     return true;
   }
@@ -226,7 +226,7 @@ class LudoEngine {
         this.nextTurn();
       } else {
         this.state = 'waiting_for_roll';
-        this.turnDeadline = Date.now() + 15000; // Reset timer for the extra roll
+        this.turnDeadline = Date.now() + 45000; // Reset timer for the extra roll
       }
     }
   }
@@ -281,7 +281,7 @@ class LudoEngine {
     // Removed: this.diceRoll = null; (Preserve last roll value for the UI)
     this.consecutiveSixes = 0;
     this.state = 'waiting_for_roll';
-    this.turnDeadline = Date.now() + 15000; // 15 seconds timer
+    this.turnDeadline = Date.now() + 45000; // 45 seconds timer
   }
 
   kickPlayer(playerId) {
