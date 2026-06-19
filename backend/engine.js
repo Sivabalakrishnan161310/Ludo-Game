@@ -226,6 +226,7 @@ class LudoEngine {
         this.nextTurn();
       } else {
         this.state = 'waiting_for_roll';
+        this.turnDeadline = Date.now() + 15000; // Reset timer for the extra roll
       }
     }
   }
