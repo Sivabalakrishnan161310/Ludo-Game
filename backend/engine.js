@@ -23,13 +23,17 @@ class LudoEngine {
           { id: 1, position: -1, status: 'base' },
           { id: 2, position: -1, status: 'base' },
           { id: 3, position: -1, status: 'base' }
-        ]
+        ],
+        isKicked: false,
+        rank: null
       };
     });
     this.turnIndex = 0;
-    this.diceRoll = null;
+    this.currentRank = 1;
+    this.diceRoll = crypto.randomInt(1, 7); // Start with a random face instead of defaulting to 1
     this.consecutiveSixes = 0;
     this.state = 'waiting_for_roll'; // waiting_for_roll, waiting_for_move, finished
+    this.turnDeadline = Date.now() + 15000; // 15 seconds timer
     this.lastAction = 'Game Started! Roll the dice.';
   }
 
@@ -64,6 +68,7 @@ class LudoEngine {
     } else {
       this.lastAction = `${this.activePlayer.name} rolled a ${this.diceRoll}.`;
       this.state = 'waiting_for_move';
+      this.turnDeadline = Date.now() + 15000; // Reset timer for move
     }
     return true;
   }
@@ -116,6 +121,9 @@ class LudoEngine {
       token.status = 'main';
       token.position = startPos;
       this.lastAction = `${this.activePlayer.name} unlocked a token!`;
+      this.state = 'animating';
+      this.animationDuration = 500; // Quick unlock animation
+      return true;
     } else if (token.status === 'main') {
       let traveled = token.position >= startPos ? (token.position - startPos) : (this.mainTrackLength - startPos + token.position);
       
@@ -127,10 +135,12 @@ class LudoEngine {
           token.position = 999;
           this.lastAction = `${this.activePlayer.name} brought a token HOME!`;
           getAnotherTurn = true;
+          this.animationDuration = 2000;
         } else {
           token.status = 'homestretch';
           token.position = 100 + homeStretchPos;
           this.lastAction = `${this.activePlayer.name} entered the home stretch.`;
+          this.animationDuration = (this.diceRoll + 1) * 250;
         }
       } else {
         // Moving on main track
@@ -142,6 +152,7 @@ class LudoEngine {
         if (captured) {
           getAnotherTurn = true;
           this.lastAction = `${this.activePlayer.name} captured an opponent's token!`;
+          this.animationDuration = 2500; // Longer delay to allow victim slide-back
         } else {
           // Check if landed on safe zone
           const safeZones = [];
@@ -152,6 +163,7 @@ class LudoEngine {
           if (safeZones.includes(token.position)) {
             this.lastAction = `${this.activePlayer.name} landed on a safe zone!`;
           }
+          this.animationDuration = (this.diceRoll + 1) * 250; // 250ms per step
         }
       }
     } else if (token.status === 'homestretch') {
@@ -171,22 +183,55 @@ class LudoEngine {
 
     // Check win condition
     const hasWon = this.activePlayer.tokens.every(t => t.status === 'home');
-    if (hasWon) {
-      this.state = 'finished';
-      this.lastAction = `${this.activePlayer.name} HAS WON THE GAME!`;
+    if (hasWon && !this.activePlayer.rank) {
+      this.activePlayer.rank = this.currentRank++;
+      this.lastWinner = this.activePlayer;
+      
+      const activePlayers = this.players.filter(p => !p.isKicked && !p.rank);
+      if (activePlayers.length === 0) {
+        this.state = 'finished';
+        this.lastAction = 'Everyone has finished!';
+      } else if (activePlayers.length === 1) {
+        // Only one player left, they are the loser!
+        activePlayers[0].rank = this.currentRank;
+        this.state = 'finished';
+        this.lastAction = `${this.activePlayer.name} finished ${this.getRankName(this.activePlayer.rank)}! ${activePlayers[0].name} is the LOSER!`;
+        this.pendingNextTurn = false; // Game over
+      } else {
+        // Still players left, trigger celebration
+        this.pendingCelebration = true;
+        this.lastAction = `${this.activePlayer.name} finished ${this.getRankName(this.activePlayer.rank)}!`;
+        this.pendingNextTurn = true; // After celebration, pass turn since they are done
+      }
     }
 
     return true;
   }
 
+  getRankName(rank) {
+    if (rank === 1) return '1st Place';
+    if (rank === 2) return '2nd Place';
+    if (rank === 3) return '3rd Place';
+    return `${rank}th Place`;
+  }
+
   completeAnimation() {
     if (this.state === 'animating') {
-      if (this.pendingNextTurn) {
+      if (this.pendingCelebration) {
+        this.state = 'celebrating';
+        this.pendingCelebration = false;
+        // The server will hold this state for 6 seconds then call completeCelebration()
+      } else if (this.pendingNextTurn) {
         this.nextTurn();
       } else {
         this.state = 'waiting_for_roll';
-        this.diceRoll = null;
       }
+    }
+  }
+
+  completeCelebration() {
+    if (this.state === 'celebrating') {
+      this.nextTurn();
     }
   }
 
@@ -215,10 +260,57 @@ class LudoEngine {
   }
 
   nextTurn() {
-    this.turnIndex = (this.turnIndex + 1) % this.players.length;
-    this.diceRoll = null;
+    // Before moving turn, check if the game should already be over due to kicks/wins
+    const activePlayers = this.players.filter(p => !p.isKicked && !p.rank);
+    if (activePlayers.length <= 1) {
+       if (activePlayers.length === 1) {
+          activePlayers[0].rank = this.currentRank;
+       }
+       this.state = 'finished';
+       this.lastAction = 'Game Over!';
+       return;
+    }
+
+    let originalIndex = this.turnIndex;
+    do {
+      this.turnIndex = (this.turnIndex + 1) % this.players.length;
+    } while ((this.activePlayer.isKicked || this.activePlayer.rank !== null) && this.turnIndex !== originalIndex);
+
+    // Removed: this.diceRoll = null; (Preserve last roll value for the UI)
     this.consecutiveSixes = 0;
     this.state = 'waiting_for_roll';
+    this.turnDeadline = Date.now() + 15000; // 15 seconds timer
+  }
+
+  kickPlayer(playerId) {
+    const p = this.players.find(p => p.id === playerId || p.persistentId === playerId);
+    if (p && !p.isKicked) {
+      p.isKicked = true;
+      this.lastAction = `${p.name} was kicked from the game!`;
+      
+      const activePlayers = this.players.filter(pl => !pl.isKicked && !pl.rank);
+      if (activePlayers.length <= 1) {
+         if (activePlayers.length === 1) activePlayers[0].rank = this.currentRank;
+         this.state = 'finished';
+         this.lastAction = 'Game Over! Not enough active players.';
+         return true;
+      }
+
+      if (this.activePlayer.id === p.id) {
+        this.nextTurn();
+      }
+      return true;
+    }
+    return false;
+  }
+
+  autoSkipTurn() {
+    if (this.state === 'waiting_for_roll' || this.state === 'waiting_for_move') {
+      this.lastAction = `${this.activePlayer.name} took too long and lost their turn!`;
+      this.nextTurn();
+      return true;
+    }
+    return false;
   }
 
   getState() {
@@ -232,7 +324,9 @@ class LudoEngine {
       diceRoll: this.diceRoll,
       state: this.state,
       lastAction: this.lastAction,
-      validMoves: validMoves
+      lastWinner: this.lastWinner,
+      validMoves: validMoves,
+      turnDeadline: this.turnDeadline
     };
   }
 }

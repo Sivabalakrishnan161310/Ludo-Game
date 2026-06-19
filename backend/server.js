@@ -21,6 +21,30 @@ const io = new Server(server, {
 // In-memory data store for lobbies and games
 const rooms = {};
 
+// Helper to manage turn timers
+function setupTurnTimer(roomId, io) {
+  const room = rooms[roomId];
+  if (!room || !room.engine || room.engine.state === 'finished') return;
+  
+  if (room.turnTimer) clearTimeout(room.turnTimer);
+  
+  const delay = Math.max(0, room.engine.turnDeadline - Date.now());
+  
+  room.turnTimer = setTimeout(() => {
+    if (rooms[roomId] && rooms[roomId].engine) {
+      if ((rooms[roomId].engine.state === 'waiting_for_roll' || rooms[roomId].engine.state === 'waiting_for_move') && Date.now() >= rooms[roomId].engine.turnDeadline - 100) {
+        const skipped = rooms[roomId].engine.autoSkipTurn();
+        if (skipped) {
+          rooms[roomId].gameState = rooms[roomId].engine.getState();
+          if (rooms[roomId].engine.state === 'finished') rooms[roomId].status = 'finished';
+          io.to(roomId).emit('room_update', rooms[roomId]);
+          setupTurnTimer(roomId, io);
+        }
+      }
+    }
+  }, delay);
+}
+
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
 
@@ -38,7 +62,13 @@ io.on('connection', (socket) => {
         maxPlayers: Math.min(Math.max(parsedMax, 2), 6), // between 2 and 6
         players: [], // Array of player objects
         status: 'lobby', // 'lobby' | 'playing' | 'finished'
-        gameState: null // Will hold the board state later
+        gameState: null, // Will hold the board state later
+        timeout: setTimeout(() => {
+          if (rooms[roomId]) {
+            delete rooms[roomId];
+            console.log(`Room ${roomId} forcefully deleted after 3 hours.`);
+          }
+        }, 3 * 60 * 60 * 1000) // 3 hours
       };
     } else if (isCreating) {
       // Prevent creating a room that already exists unless reconnecting
@@ -56,6 +86,7 @@ io.on('connection', (socket) => {
     if (existingPlayer) {
        // Update socket id for the reconnected player!
        existingPlayer.id = socket.id;
+       existingPlayer.connected = true;
        if (room.engine) {
           const enginePlayer = room.engine.players.find(p => p.persistentId === playerId);
           if (enginePlayer) {
@@ -79,7 +110,8 @@ io.on('connection', (socket) => {
       persistentId: playerId,
       name: playerName,
       color: null, // Assigned later
-      isReady: false
+      isReady: false,
+      connected: true
     });
 
     socket.join(roomId);
@@ -114,6 +146,7 @@ io.on('connection', (socket) => {
           room.gameState = room.engine.getState();
           io.to(roomId).emit('game_started', room);
           io.to(roomId).emit('room_update', room);
+          setupTurnTimer(roomId, io);
         } else {
           socket.emit('error_message', 'Not all players are ready.');
         }
@@ -160,14 +193,21 @@ io.on('connection', (socket) => {
       const success = room.engine.rollDice(socket.id);
       if (success) {
         room.gameState = room.engine.getState();
+        if (room.engine.state === 'finished') room.status = 'finished';
         io.to(roomId).emit('room_update', room);
+        
+        if (room.engine.state === 'waiting_for_move') {
+          setupTurnTimer(roomId, io);
+        }
 
         if (room.engine.state === 'animating_roll') {
           setTimeout(() => {
             if (rooms[roomId] && rooms[roomId].engine) {
               rooms[roomId].engine.completeRollAnimation();
               rooms[roomId].gameState = rooms[roomId].engine.getState();
+              if (rooms[roomId].engine.state === 'finished') rooms[roomId].status = 'finished';
               io.to(roomId).emit('room_update', rooms[roomId]);
+              setupTurnTimer(roomId, io);
             }
           }, 1500); // 1.5s delay to let dice roll animation finish
         }
@@ -184,14 +224,50 @@ io.on('connection', (socket) => {
         io.to(roomId).emit('room_update', room);
 
         if (room.engine.state === 'animating') {
+          const delay = room.engine.animationDuration || 1500;
           setTimeout(() => {
             // Check if room still exists and engine state hasn't been corrupted
             if (rooms[roomId] && rooms[roomId].engine) {
               rooms[roomId].engine.completeAnimation();
               rooms[roomId].gameState = rooms[roomId].engine.getState();
+              if (rooms[roomId].engine.state === 'finished') rooms[roomId].status = 'finished';
               io.to(roomId).emit('room_update', rooms[roomId]);
+              setupTurnTimer(roomId, io);
+
+              if (rooms[roomId].engine.state === 'celebrating') {
+                setTimeout(() => {
+                  if (rooms[roomId] && rooms[roomId].engine) {
+                     rooms[roomId].engine.completeCelebration();
+                     rooms[roomId].gameState = rooms[roomId].engine.getState();
+                     if (rooms[roomId].engine.state === 'finished') rooms[roomId].status = 'finished';
+                     io.to(roomId).emit('room_update', rooms[roomId]);
+                     setupTurnTimer(roomId, io);
+                  }
+                }, 6000);
+              }
             }
-          }, 1500); // 1.5 seconds delay for animation
+          }, delay);
+        }
+      }
+    }
+  });
+
+  socket.on('kick_player', ({ roomId, targetPlayerId }) => {
+    const room = rooms[roomId];
+    if (room && room.engine) {
+      // Verify sender is the host (creator is players[0])
+      const host = room.players[0];
+      if (host && host.id === socket.id) {
+        const success = room.engine.kickPlayer(targetPlayerId);
+        if (success) {
+          // Also mark them as disconnected to prevent them doing things if they are still connected
+          const pIndex = room.players.findIndex(p => p.persistentId === targetPlayerId);
+          if (pIndex !== -1) room.players[pIndex].connected = false;
+
+          room.gameState = room.engine.getState();
+          if (room.engine.state === 'finished') room.status = 'finished';
+          io.to(roomId).emit('room_update', room);
+          setupTurnTimer(roomId, io);
         }
       }
     }
@@ -207,15 +283,27 @@ io.on('connection', (socket) => {
       
       if (playerIndex !== -1) {
         // Player found in this room
-        room.players.splice(playerIndex, 1);
-        
-        // If room is empty, delete it
-        if (room.players.length === 0) {
-          delete rooms[roomId];
-          console.log(`Room ${roomId} deleted (empty)`);
+        if (room.status === 'playing') {
+          // Keep player in memory so they can reconnect during active game
+          room.players[playerIndex].connected = false;
         } else {
-          // Notify remaining players
-          io.to(roomId).emit('room_update', room);
+          // Lobby or Finished: completely remove them
+          room.players.splice(playerIndex, 1);
+        }
+        
+        // Notify remaining players
+        io.to(roomId).emit('room_update', room);
+
+        // Check if room is completely empty
+        const activeCount = room.players.filter(p => p.connected !== false).length;
+        if (activeCount === 0) {
+          if (room.status === 'playing') {
+            console.log(`Room ${roomId} is empty but playing. Keeping alive for reconnection.`);
+          } else {
+            clearTimeout(room.timeout);
+            delete rooms[roomId];
+            console.log(`Room ${roomId} deleted (empty and not playing)`);
+          }
         }
         break; // A socket is usually only in one custom game room
       }

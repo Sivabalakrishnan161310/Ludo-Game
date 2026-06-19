@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { playSteps, playSound } from '../utils/audio';
 
@@ -128,7 +128,8 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
   const prevPlayers = usePrevious(players);
   const [tokenAnimData, setTokenAnimData] = useState({});
 
-  useEffect(() => {
+  // useLayoutEffect runs before the browser paints, eliminating the 1-frame flicker glitch!
+  useLayoutEffect(() => {
     if (!prevPlayers) return;
     
     // Start fresh! This ensures tokens don't replay old animations on subsequent renders
@@ -151,6 +152,9 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
             const isUnlock = prevToken.status === 'base' && token.status === 'main';
             const isHome = prevToken.status !== 'home' && token.status === 'home';
             
+            // Get exact starting coordinates
+            const originPos = getTokenPosition(pColorIndex, prevToken);
+
             // Check safe zone landing
             const greyStarIndices = [3, 16, 29, 42];
             const startIndices = [8, 21, 34, 47];
@@ -162,6 +166,8 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
             // Use unique key combining player ID and token ID
             newAnimData[`${player.id}-${token.id}`] = { 
               path, 
+              originX: originPos.x,
+              originY: originPos.y,
               isCapture: isVictim 
             };
             hasChanges = true;
@@ -175,7 +181,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
             if (isUnlock) {
                playSound('token_unlock');
             } else if (!isVictim) {
-               playSteps(path.length, 200, finalSound); // 0.2s per step, replaces last step with finalSound
+               playSteps(path.length, 250, finalSound); // 0.25s per step, replaces last step with finalSound
             }
           }
         }
@@ -383,24 +389,71 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
             if (animData && animData.path && animData.path.length > 0) {
               const pathCoords = animData.path;
               const isCapture = animData.isCapture;
-              animateProps = {
-                x: [null, ...pathCoords.map(p => p.x), finalX],
-                y: [null, ...pathCoords.map(p => p.y), finalY]
-              };
-              const keyframesCount = pathCoords.length + 2;
-              const times = Array.from({ length: keyframesCount }).map((_, i) => i / (keyframesCount - 1));
-              const durationPerStep = isCapture ? 0.05 : 0.2;
-              const totalDuration = (pathCoords.length + 1) * durationPerStep;
-              transitionProps = {
-                x: { duration: totalDuration, times, ease: "linear" },
-                y: { duration: totalDuration, times, ease: "linear" }
-              };
+              const N = pathCoords.length;
+
+              if (isCapture) {
+                // Smooth rapid slide back to base for captured tokens
+                animateProps = {
+                  x: [null, ...pathCoords.map(p => p.x), finalX],
+                  y: [null, ...pathCoords.map(p => p.y), finalY]
+                };
+                const keyframesCount = N + 2;
+                const times = Array.from({ length: keyframesCount }).map((_, i) => i / (keyframesCount - 1));
+                const totalDuration = (N + 1) * 0.05;
+                transitionProps = {
+                  x: { duration: totalDuration, times, ease: "linear" },
+                  y: { duration: totalDuration, times, ease: "linear" }
+                };
+              } else {
+                // Bouncy Hop animation for regular moving tokens
+                const hopX = [animData.originX]; // Force exact start position!
+                const hopY = [animData.originY];
+                const hopScale = [1];
+                const times = [0];
+                
+                // Use exact origin coordinates for midpoint calculations instead of final offset coordinates
+                let currentPx = animData.originX;
+                let currentPy = animData.originY;
+                
+                pathCoords.forEach((p, idx) => {
+                  const stepNumber = idx + 1;
+                  
+                  // Midpoint Hop: Strictly linear X/Y path, just scale up for the illusion
+                  hopX.push((currentPx + p.x) / 2);
+                  hopY.push((currentPy + p.y) / 2); 
+                  hopScale.push(1.3);
+                  times.push((stepNumber - 0.5) / (N + 1));
+                  
+                  // Landing
+                  hopX.push(p.x);
+                  hopY.push(p.y);
+                  hopScale.push(1);
+                  times.push(stepNumber / (N + 1));
+                  
+                  currentPx = p.x;
+                  currentPy = p.y;
+                });
+                
+                // Final slide to offset position (if stacking with other tokens)
+                hopX.push(finalX);
+                hopY.push(finalY);
+                hopScale.push(1);
+                times.push(1);
+                
+                animateProps = { x: hopX, y: hopY, scale: hopScale };
+                const totalDuration = (N + 1) * 0.25;
+                transitionProps = {
+                  x: { duration: totalDuration, times, ease: "linear" },
+                  y: { duration: totalDuration, times, ease: "linear" },
+                  scale: { duration: totalDuration, times, ease: "linear" }
+                };
+              }
             }
 
             if (isHighlight) {
                animateProps.scale = [1, 1.25, 1];
                transitionProps.scale = { repeat: Infinity, duration: 1, ease: "easeInOut" };
-            } else {
+            } else if (!animateProps.scale) {
                animateProps.scale = 1;
             }
             

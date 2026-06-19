@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { socket } from './Lobby';
 import Board from '../components/Board';
 import BoardClassic from '../components/BoardClassic';
@@ -9,6 +9,53 @@ import { playSound } from '../utils/audio';
 
 const classicColors = ['#e63946', '#2a9d8f', '#e9c46a', '#457b9d'];
 const starColors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#a855f7', '#06b6d4'];
+
+const CelebrationOverlay = ({ winner }) => {
+  if (!winner) return null;
+  
+  const rank = winner.rank;
+  const isFirst = rank === 1;
+  const color = isFirst ? '#ffd700' : rank === 2 ? '#c0c0c0' : '#cd7f32';
+  const text = isFirst ? '1ST PLACE!' : rank === 2 ? '2ND PLACE!' : '3RD PLACE!';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={{
+        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+        background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+        display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
+        zIndex: 1000, pointerEvents: 'none'
+      }}
+    >
+      <motion.h1
+        initial={{ scale: 0, rotate: -15 }}
+        animate={{ scale: [0, 1.5, 1], rotate: [-15, 10, 0] }}
+        transition={{ type: "spring", stiffness: 200, damping: 10 }}
+        style={{
+          fontSize: isFirst ? '8rem' : '5rem',
+          color: color,
+          textShadow: `0 0 20px ${color}, 0 0 40px ${color}`,
+          margin: 0,
+          textAlign: 'center',
+          fontFamily: 'Impact, sans-serif'
+        }}
+      >
+        {text}
+      </motion.h1>
+      <motion.h2
+        initial={{ y: 50, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.5 }}
+        style={{ color: 'white', fontSize: '3rem', marginTop: '1rem', textShadow: '0 4px 6px rgba(0,0,0,0.5)' }}
+      >
+        {winner.name} finished!
+      </motion.h2>
+    </motion.div>
+  );
+};
 
 const Game = () => {
   const { roomId } = useParams();
@@ -38,6 +85,8 @@ const Game = () => {
     };
   }, [roomId, navigate]);
 
+  const [prevCelebrating, setPrevCelebrating] = useState(false);
+
   useEffect(() => {
     if (roomData && roomData.gameState) {
       const action = roomData.gameState.lastAction;
@@ -46,15 +95,16 @@ const Game = () => {
           setRollTrigger(prev => prev + 1);
           playSound('dice_roll');
         }
-        
-        if (action.includes('HAS WON THE GAME')) {
-          playSound('dude_oorum_blood');
-        }
-
         setPrevAction(action);
       }
+
+      const isCelebrating = roomData.gameState.state === 'celebrating';
+      if (isCelebrating && !prevCelebrating) {
+        playSound('dude_oorum_blood'); // Play win audio for 1st/2nd/3rd place!
+      }
+      setPrevCelebrating(isCelebrating);
     }
-  }, [roomData, prevAction]);
+  }, [roomData, prevAction, prevCelebrating]);
 
   useEffect(() => {
     if (roomData && roomData.gameState && roomData.gameState.state === 'waiting_for_move') {
@@ -123,6 +173,69 @@ const Game = () => {
   return (
     <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', height: '100vh', padding: '1rem', overflow: 'hidden', background: '#0f172a', color: 'white' }}>
       
+      {/* Celebration Overlay */}
+      <AnimatePresence>
+        {gameState.state === 'celebrating' && (
+          <CelebrationOverlay winner={gameState.lastWinner} />
+        )}
+      </AnimatePresence>
+
+      {/* Game Over Leaderboard / Loser Tease */}
+      {gameState.state === 'finished' && (
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.95)', zIndex: 50, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <motion.h1 
+            initial={{ scale: 0 }} animate={{ scale: 1 }}
+            style={{ color: '#ffd700', fontSize: '4rem', margin: 0, marginBottom: '2rem', textShadow: '0 0 20px rgba(255, 215, 0, 0.5)' }}
+          >
+            Game Over!
+          </motion.h1>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '400px' }}>
+            {gameState.players.slice().sort((a, b) => {
+               // Kicked players go to very bottom
+               if (a.isKicked && !b.isKicked) return 1;
+               if (!a.isKicked && b.isKicked) return -1;
+               // Ranked players go first
+               return (a.rank || 99) - (b.rank || 99);
+            }).map(p => (
+              <motion.div 
+                key={p.id} 
+                initial={{ x: -50, opacity: 0 }} animate={{ x: 0, opacity: 1 }}
+                style={{
+                  background: 'rgba(255,255,255,0.1)', padding: '1rem 2rem', borderRadius: '12px',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  borderLeft: `6px solid ${activeColors[p.colorIndex % activeColors.length]}`,
+                  opacity: p.isKicked ? 0.4 : 1
+                }}
+              >
+                <span style={{ color: 'white', fontSize: '1.5rem', fontWeight: 'bold', textDecoration: p.isKicked ? 'line-through' : 'none' }}>{p.name}</span>
+                <span style={{ 
+                  color: p.rank === 1 ? '#ffd700' : p.rank === 2 ? '#c0c0c0' : p.rank === 3 ? '#cd7f32' : p.isKicked ? '#ef4444' : '#ef4444',
+                  fontSize: '1.5rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem'
+                }}>
+                  {p.isKicked ? 'KICKED' : p.rank ? (
+                    `${p.rank}${p.rank === 1 ? 'st' : p.rank === 2 ? 'nd' : p.rank === 3 ? 'rd' : 'th'} Place`
+                  ) : (
+                    <motion.div animate={{ y: [0, -10, 0], scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1 }}>
+                      LOSER 💩
+                    </motion.div>
+                  )}
+                </span>
+              </motion.div>
+            ))}
+          </div>
+          
+          <button 
+            onClick={() => navigate('/')}
+            style={{ marginTop: '3rem', padding: '1rem 3rem', fontSize: '1.2rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', transition: 'background 0.2s' }}
+            onMouseOver={e => e.target.style.background = '#2563eb'}
+            onMouseOut={e => e.target.style.background = '#3b82f6'}
+          >
+            Back to Lobby
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div style={{ textAlign: 'center', marginBottom: '1rem', flexShrink: 0, zIndex: 20 }}>
         <h1 style={{ margin: 0, fontSize: '2rem', background: 'linear-gradient(to right, #a855f7, #ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
@@ -138,26 +251,64 @@ const Game = () => {
         {!isClassic && (
           <div style={{ width: '280px', display: 'flex', flexDirection: 'column', gap: '1.5rem', flexShrink: 0 }}>
             {/* Players List */}
-            <div className="modern-glass" style={{ padding: '1rem', borderRadius: '16px', background: 'rgba(255,255,255,0.05)', flex: 1, overflowY: 'auto' }}>
+            <div className="modern-glass" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '16px', overflowY: 'auto', flex: 1 }}>
               <h3 style={{ marginTop: 0, color: '#e2e8f0', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>Players</h3>
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                {gameState.players.map(p => (
-                  <li key={p.id} style={{ 
-                    padding: '0.8rem', 
-                    background: p.id === activePlayer.id ? 'rgba(255,255,255,0.1)' : 'transparent',
-                    borderRadius: '8px',
-                    borderLeft: `4px solid ${activeColors[p.colorIndex % activeColors.length]}`,
-                    marginBottom: '0.5rem',
-                    fontSize: '1.1rem',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
+              {gameState.players.map((p, idx) => {
+                const isThisPlayersTurn = gameState.turnIndex === idx;
+                const isMe = p.id === socket.id;
+                const isHost = roomData.players[0] && roomData.players[0].persistentId === localPlayerId;
+                const isKicked = p.isKicked;
+                const playerColor = activeColors[p.colorIndex % activeColors.length];
+
+                return (
+                  <div key={p.id} style={{
+                    display: 'flex', alignItems: 'center', gap: '1rem',
+                    opacity: (isThisPlayersTurn || roomData.status === 'lobby') && !isKicked ? 1 : 0.5,
+                    transition: 'opacity 0.3s ease',
+                    background: isThisPlayersTurn ? 'rgba(255,255,255,0.1)' : 'transparent',
+                    padding: '0.5rem', borderRadius: '12px'
                   }}>
-                    <span>{p.name}</span>
-                    {p.id === socket.id && <span style={{ fontSize: '0.8rem', color: '#a855f7', fontWeight: 'bold' }}>YOU</span>}
-                  </li>
-                ))}
-              </ul>
+                    <div style={{ position: 'relative', width: '54px', height: '54px', display: 'flex', justifyContent: 'center', alignItems: 'center', flexShrink: 0 }}>
+                      {/* The Golden Timer Ring */}
+                      {isThisPlayersTurn && !isKicked && gameState.turnDeadline && (
+                        <svg width="54" height="54" style={{ position: 'absolute', top: 0, left: 0, transform: 'rotate(-90deg)' }}>
+                          <motion.circle
+                            key={gameState.turnDeadline}
+                            cx="27" cy="27" r="25"
+                            stroke="#ffd700" strokeWidth="3" fill="transparent"
+                            strokeDasharray={2 * Math.PI * 25}
+                            initial={{ strokeDashoffset: 0 }}
+                            animate={{ strokeDashoffset: 2 * Math.PI * 25 }}
+                            transition={{ duration: Math.max(0, gameState.turnDeadline - Date.now()) / 1000, ease: "linear" }}
+                          />
+                        </svg>
+                      )}
+                      
+                      <div style={{
+                        width: '46px', height: '46px', borderRadius: '50%',
+                        backgroundColor: isKicked ? '#555' : playerColor,
+                        border: isThisPlayersTurn ? '2px solid white' : '2px solid transparent',
+                        display: 'flex', justifyContent: 'center', alignItems: 'center',
+                        color: 'white', fontWeight: 'bold', fontSize: '1rem',
+                        zIndex: 1
+                      }}>
+                        {p.name.substring(0, 2).toUpperCase()}
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                      <span style={{ fontWeight: 'bold', color: isKicked ? '#ef4444' : 'white', textDecoration: isKicked ? 'line-through' : 'none' }}>
+                        {p.name} {isMe && '(You)'}
+                      </span>
+                      {isHost && !isMe && !isKicked && roomData.status === 'playing' && (
+                        <button onClick={() => socket.emit('kick_player', { roomId, targetPlayerId: p.persistentId })}
+                          style={{ marginTop: '4px', padding: '2px 8px', fontSize: '0.7rem', background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', alignSelf: 'flex-start' }}
+                        >Kick</button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Dice & Turn Actions */}
@@ -221,13 +372,50 @@ const Game = () => {
                   <Dice value={isThisPlayersTurn ? (gameState.diceRoll || 1) : 1} rollTrigger={rollTrigger} />
                 </div>
                 
-                {/* Player info under the dice */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'white', opacity: isThisPlayersTurn ? 1 : 0.6 }}>{p.name}</span>
+                {/* Player info and Timer Profile */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', marginTop: '1rem' }}>
+                  
+                  {/* Player Profile Picture with Timer Ring */}
+                  <div style={{ position: 'relative', width: '68px', height: '68px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                    {isThisPlayersTurn && !p.isKicked && gameState.turnDeadline && (
+                      <svg width="68" height="68" style={{ position: 'absolute', top: 0, left: 0, transform: 'rotate(-90deg)' }}>
+                        <motion.circle
+                          key={gameState.turnDeadline}
+                          cx="34" cy="34" r="32"
+                          stroke="#ffd700" strokeWidth="4" fill="transparent"
+                          strokeDasharray={2 * Math.PI * 32}
+                          initial={{ strokeDashoffset: 0 }}
+                          animate={{ strokeDashoffset: 2 * Math.PI * 32 }}
+                          transition={{ duration: Math.max(0, gameState.turnDeadline - Date.now()) / 1000, ease: "linear" }}
+                        />
+                      </svg>
+                    )}
+                    <div style={{
+                      width: '60px', height: '60px', borderRadius: '50%',
+                      backgroundColor: p.isKicked ? '#555' : playerColor,
+                      border: isThisPlayersTurn ? '2px solid white' : '2px solid transparent',
+                      boxShadow: isThisPlayersTurn && !p.isKicked ? `0 0 15px ${playerColor}` : 'none',
+                      display: 'flex', justifyContent: 'center', alignItems: 'center',
+                      color: 'white', fontWeight: 'bold', fontSize: '1.4rem',
+                      textShadow: '1px 1px 2px rgba(0,0,0,0.5)', zIndex: 1
+                    }}>
+                      {p.name.substring(0, 2).toUpperCase()}
+                    </div>
+                  </div>
+
+                  <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: p.isKicked ? '#ef4444' : 'white', opacity: isThisPlayersTurn ? 1 : 0.6, textDecoration: p.isKicked ? 'line-through' : 'none' }}>{p.name}</span>
                   {p.id === socket.id && <span style={{ fontSize: '0.8rem', color: '#a855f7', fontWeight: 'bold', opacity: isThisPlayersTurn ? 1 : 0.6 }}>YOU</span>}
                   
                   {isThisPlayersTurn && isMyTurn && gameState.state === 'waiting_for_move' && (
-                    <span style={{ color: '#34d399', fontSize: '0.8rem', marginTop: '0.5rem', fontWeight: 'bold' }}>Move token</span>
+                    <span style={{ color: '#34d399', fontSize: '0.8rem', fontWeight: 'bold' }}>Move token</span>
+                  )}
+
+                  {/* Kick Button for Host */}
+                  {roomData.players[0] && roomData.players[0].persistentId === localPlayerId && p.id !== socket.id && !p.isKicked && (
+                    <button 
+                      onClick={() => socket.emit('kick_player', { roomId, targetPlayerId: p.persistentId })}
+                      style={{ marginTop: '4px', padding: '4px 12px', fontSize: '0.8rem', background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                    >Kick</button>
                   )}
                 </div>
               </motion.div>
