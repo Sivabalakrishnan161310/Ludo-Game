@@ -2,6 +2,39 @@ import React, { useEffect, useLayoutEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { playSteps, playSound } from '../utils/audio';
 
+const MonsterChomp = ({ x, y }) => {
+  return (
+    <motion.g
+      initial={{ scale: 0, opacity: 0 }}
+      animate={{ scale: [0, 1.4, 1.4, 0], opacity: [0, 1, 1, 0] }}
+      transition={{ duration: 0.7, times: [0, 0.15, 0.85, 1] }}
+      style={{ x, y, pointerEvents: 'none' }}
+    >
+      <ellipse cx={0} cy={12} rx={22} ry={6} fill="rgba(0,0,0,0.5)" />
+      {/* Monster Body */}
+      <circle cx={0} cy={-4} r={24} fill="#8b5cf6" />
+      {/* Angry Eyes */}
+      <path d="M -12,-14 L -4,-8 M 12,-14 L 4,-8" stroke="white" strokeWidth="3" strokeLinecap="round" />
+      <circle cx={-6} cy={-8} r={3} fill="#ef4444" />
+      <circle cx={6} cy={-8} r={3} fill="#ef4444" />
+      {/* Chomping Mouth */}
+      <motion.path
+        fill="#111827"
+        animate={{ 
+          d: [
+            "M -18,4 Q 0,20 18,4 Z", // open mouth
+            "M -18,4 Q 0,4 18,4 Z",  // closed mouth
+            "M -18,4 Q 0,20 18,4 Z"  // open mouth
+          ]
+        }}
+        transition={{ repeat: Infinity, duration: 0.15 }}
+      />
+      {/* Teeth (Top) */}
+      <path d="M -16,4 L -12,8 L -8,4 L -4,8 L 0,4 L 4,8 L 8,4 L 12,8 L 16,4 Z" fill="white" />
+    </motion.g>
+  );
+};
+
 // Ludo King exact board colors
 const colors = ['#EB1C24', '#66CCFF', '#FFE013', '#02A04B']; // Red, Blue, Yellow, Green
 const colorsLight = ['#FF6B6B', '#5B7FCC', '#FFF06B', '#4CD97B']; // Lighter variants for gradients
@@ -132,6 +165,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
 
   // Step-by-step hopping animation state
   const [tokenAnimPos, setTokenAnimPos] = useState({});
+  const [captures, setCaptures] = useState([]);
   const animTimersRef = useRef({});
 
   useEffect(() => {
@@ -206,20 +240,33 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
 
             // For captures, wait for the attacker to finish their move before sliding back
             // Attacker takes (diceRoll * 200) ms.
-            const startDelay = isCapture ? (gameState.diceRoll * 200) : 0;
-            // Captures slide back at 100ms per tile (slightly slower than before for better visibility)
-            const stepDelay = isCapture ? 100 : 200;
+            const attackerDelay = isCapture ? (gameState.diceRoll * 200) : 0;
+            const monsterDelay = isCapture ? 400 : 0; // Wait 400ms for monster to swallow
+            const startDelay = attackerDelay + monsterDelay;
+            const stepDelay = isCapture ? 60 : 200;
 
             // If there's a start delay (like a capture), lock the token at its original position immediately
             // so it doesn't snap to the base while waiting for the attacker to finish.
-            if (startDelay > 0) {
-              setTokenAnimPos(prev => ({ ...prev, [key]: getTokenPosition(pColorIndex, prevToken) }));
+            if (attackerDelay > 0) {
+              const capPos = getTokenPosition(pColorIndex, prevToken);
+              setTokenAnimPos(prev => ({ ...prev, [key]: { ...capPos, isWaiting: true } }));
+              
+              // Trigger monster animation right as attacker lands
+              setTimeout(() => {
+                const captureId = `cap-${key}-${Date.now()}`;
+                setCaptures(prev => [...prev, { id: captureId, x: capPos.x, y: capPos.y }]);
+                
+                // Hide monster after it chomps
+                setTimeout(() => {
+                  setCaptures(prev => prev.filter(c => c.id !== captureId));
+                }, 700);
+              }, attackerDelay);
             }
 
             // Queue each step with a delay
             path.forEach((pos, idx) => {
               const timer = setTimeout(() => {
-                setTokenAnimPos(prev => ({ ...prev, [key]: pos }));
+                setTokenAnimPos(prev => ({ ...prev, [key]: { ...pos, isSlide: isCapture } }));
 
                 // After last step, clean up so token snaps to its true final position
                 if (idx === path.length - 1) {
@@ -229,7 +276,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
                       delete next[key];
                       return next;
                     });
-                  }, 250); // Wait for hop to settle
+                  }, isCapture ? 50 : 250); // Wait for hop/slide to settle
                   animTimersRef.current[key].push(cleanup);
                 }
               }, startDelay + (idx * stepDelay));
@@ -239,7 +286,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
         }
       });
     });
-  }, [players, prevPlayers]);
+  }, [players, prevPlayers, gameState]);
 
   // Cleanup animation timers on unmount
   useEffect(() => {
@@ -358,7 +405,7 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
   };
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', height: '100%', overflow: 'hidden', padding: '1rem' }}>
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative', width: '100%', height: '100%', overflow: 'hidden', padding: '1rem' }}>
       <svg 
         style={{ 
           width: '100%', height: '100%',
@@ -452,22 +499,20 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
             let transitionProps = { type: "spring", stiffness: 300, damping: 25 };
 
             if (stepPos) {
-              // HOPPING: Ludo King style — fast tween, no bounce
+              // HOPPING or SLIDING
               animateProps = { x: stepPos.x, y: stepPos.y };
               transitionProps = {
                 type: "tween",
-                duration: 0.18,
-                ease: "easeOut"
+                duration: stepPos.isSlide ? 0.06 : 0.18,
+                ease: stepPos.isSlide ? "linear" : "easeOut"
               };
-            } else if (prevPlayers) {
-              // We rely on the unified tokenAnimPos system for captures now. No manual keyframes.
             }
 
             // Hop arc: animate inner group up then down for each step
             let innerAnimate = { y: 0, scale: 1 };
             let innerTransition = { duration: 0.05 };
 
-            if (stepPos) {
+            if (stepPos && !stepPos.isSlide && !stepPos.isWaiting) {
               // During a step, do a quick arc: jump up then land
               innerAnimate = { y: [0, -18, 0], scale: [1, 1.15, 1] };
               innerTransition = { 
@@ -502,22 +547,24 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
                   transition={innerTransition}
                   key={stepPos ? `hop-${stepPos.x}-${stepPos.y}` : 'idle'}
                 >
-                  {/* === LUDO KING PAWN SHAPE === */}
-                  {/* Pawn body (tapered cylinder) */}
+                  {/* === GLASS MAP PIN SHAPE === */}
                   <path
-                    d="M -8,8 Q -10,4 -7,-2 Q -5,-6 -6,-8 Q -4,-12 0,-14 Q 4,-12 6,-8 Q 5,-6 7,-2 Q 10,4 8,8 Z"
+                    d="M 0,8 C -3,3 -12,-4 -12,-12 C -12,-18.6 -6.6,-24 0,-24 C 6.6,-24 12,-18.6 12,-12 C 12,-4 3,3 0,8 Z"
                     fill={`url(#coinGrad-${pColorIndex})`}
-                    stroke={colorsDark[pColorIndex]}
-                    strokeWidth="1"
+                    stroke="rgba(255,255,255,0.5)"
+                    strokeWidth="1.5"
+                    style={{ filter: `drop-shadow(0px 0px 6px ${colors[pColorIndex]})` }}
                   />
-                  {/* Pawn head (glossy sphere on top) */}
-                  <circle cx={0} cy={-10} r={6} fill={`url(#coinGrad-${pColorIndex})`} stroke={colorsDark[pColorIndex]} strokeWidth="0.8" />
-                  {/* Head glossy highlight */}
-                  <ellipse cx={-2} cy={-12} rx={3} ry={2.5} fill="rgba(255,255,255,0.45)" />
-                  {/* Body glossy highlight */}
-                  <ellipse cx={-2} cy={-2} rx={3} ry={5} fill="rgba(255,255,255,0.2)" />
-                  {/* Base rim */}
-                  <ellipse cx={0} cy={8} rx={8} ry={2.5} fill={colorsDark[pColorIndex]} opacity="0.5" />
+                  {/* Inner Hole */}
+                  <circle cx={0} cy={-12} r={4.5} fill="#FFFFFF" opacity="0.9" />
+                  {/* Glassy highlight on top-left edge */}
+                  <path
+                    d="M -8,-17 A 10,10 0 0,1 6,-22"
+                    fill="none"
+                    stroke="rgba(255,255,255,0.7)"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
                 </motion.g>
                 
                 {/* Extra glowing ring if highlighted */}
@@ -530,6 +577,11 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
             );
           });
         })()}
+
+        {/* Monster Capture Animations */}
+        {captures.map(c => (
+          <MonsterChomp key={c.id} x={c.x} y={c.y} />
+        ))}
       </svg>
     </div>
   );

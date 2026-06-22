@@ -58,14 +58,17 @@ export const playSound = (soundName) => {
       source.buffer = cached;
       source.connect(audioCtx.destination);
       source.start(0);
+      return { stop: () => { try { source.stop() } catch(e){} } };
     } else if (cached instanceof Audio) {
       // HTML5 Fallback
       const clone = cached.cloneNode();
       clone.play().catch(e => console.warn(`Audio playback blocked for ${soundName}`, e));
+      return { stop: () => { clone.pause(); clone.currentTime = 0; } };
     } else {
       // Not loaded yet, fallback to instant creation
       const audio = new Audio(`/sounds/${soundName}.mp3`);
       audio.play().catch(e => console.warn(`Audio playback blocked for ${soundName}`, e));
+      return { stop: () => { audio.pause(); audio.currentTime = 0; } };
     }
   } catch (e) {
     console.error('Audio error', e);

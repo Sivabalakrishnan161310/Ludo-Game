@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import confetti from 'canvas-confetti';
 import { socket } from './Lobby';
 import Board from '../components/Board';
 import BoardClassic from '../components/BoardClassic';
@@ -11,6 +12,30 @@ const classicColors = ['#EB1C24', '#66CCFF', '#FFE013', '#02A04B'];
 const starColors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#a855f7', '#06b6d4'];
 
 const CelebrationOverlay = ({ winner }) => {
+  useEffect(() => {
+    const duration = 8000;
+    const animationEnd = Date.now() + duration;
+    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 2000 };
+
+    function randomInRange(min, max) {
+      return Math.random() * (max - min) + min;
+    }
+
+    const interval = setInterval(function() {
+      const timeLeft = animationEnd - Date.now();
+
+      if (timeLeft <= 0) {
+        return clearInterval(interval);
+      }
+
+      const particleCount = 50 * (timeLeft / duration);
+      confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
+      confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
+    }, 250);
+
+    return () => clearInterval(interval);
+  }, []);
+
   if (!winner) return null;
   
   const rank = winner.rank;
@@ -25,34 +50,95 @@ const CelebrationOverlay = ({ winner }) => {
       exit={{ opacity: 0 }}
       style={{
         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-        background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+        background: 'radial-gradient(circle at center, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.95) 100%)',
+        backdropFilter: 'blur(10px)',
         display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
-        zIndex: 1000, pointerEvents: 'none'
+        zIndex: 1000, pointerEvents: 'none', overflow: 'hidden'
       }}
     >
-      <motion.h1
-        initial={{ scale: 0, rotate: -15 }}
-        animate={{ scale: [0, 1.5, 1], rotate: [-15, 10, 0] }}
-        transition={{ type: "spring", stiffness: 200, damping: 10 }}
+      {/* Rotating Sunburst / Aura */}
+      <motion.div
+        animate={{ rotate: 360 }}
+        transition={{ repeat: Infinity, duration: 20, ease: "linear" }}
         style={{
-          fontSize: isFirst ? '8rem' : '5rem',
-          color: color,
-          textShadow: `0 0 20px ${color}, 0 0 40px ${color}`,
-          margin: 0,
-          textAlign: 'center',
-          fontFamily: 'Impact, sans-serif'
+          position: 'absolute',
+          width: '200vw', height: '200vw',
+          background: `conic-gradient(from 0deg, transparent 0deg, ${color}22 15deg, transparent 30deg, ${color}22 45deg, transparent 60deg, ${color}22 75deg, transparent 90deg, ${color}22 105deg, transparent 120deg, ${color}22 135deg, transparent 150deg, ${color}22 165deg, transparent 180deg, ${color}22 195deg, transparent 210deg, ${color}22 225deg, transparent 240deg, ${color}22 255deg, transparent 270deg, ${color}22 285deg, transparent 300deg, ${color}22 315deg, transparent 330deg, ${color}22 345deg, transparent 360deg)`,
+        }}
+      />
+
+      {/* Floating Particles */}
+      {[...Array(30)].map((_, i) => (
+        <motion.div
+          key={i}
+          initial={{ y: '100vh', x: `${Math.random() * 100}vw`, scale: Math.random() * 1.5 }}
+          animate={{ y: '-100vh', rotate: 360 }}
+          transition={{ duration: 3 + Math.random() * 4, repeat: Infinity, ease: "linear", delay: Math.random() * 3 }}
+          style={{
+            position: 'absolute', width: '15px', height: '15px',
+            background: Math.random() > 0.5 ? color : '#ffffff', 
+            borderRadius: '50%', opacity: 0.2 + Math.random() * 0.6,
+            boxShadow: `0 0 15px ${color}`
+          }}
+        />
+      ))}
+
+      {/* Main Badge / Rank */}
+      <motion.div
+        initial={{ scale: 0, y: -50 }}
+        animate={{ scale: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 150, damping: 15 }}
+        style={{
+           display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 10
         }}
       >
-        {text}
-      </motion.h1>
-      <motion.h2
-        initial={{ y: 50, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.5 }}
-        style={{ color: 'white', fontSize: '3rem', marginTop: '1rem', textShadow: '0 4px 6px rgba(0,0,0,0.5)' }}
-      >
-        {winner.name} finished!
-      </motion.h2>
+        <motion.h2
+          initial={{ opacity: 0, y: -20, letterSpacing: '0px' }}
+          animate={{ opacity: 1, y: 0, letterSpacing: '8px' }}
+          transition={{ delay: 0.5, duration: 1, ease: "easeOut" }}
+          style={{ 
+            color: 'white', fontSize: '2.5rem', margin: '0 0 1rem 0', 
+            textTransform: 'uppercase', opacity: 0.9, textShadow: '0 4px 10px rgba(0,0,0,0.8)'
+          }}
+        >
+          <span style={{ color }}>{winner.name}</span> finished
+        </motion.h2>
+
+        <motion.div
+          animate={{ y: [-10, 10, -10], scale: [1, 1.02, 1] }}
+          transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+        >
+          <motion.h1
+            initial={{ scale: 0, rotateX: 90 }}
+            animate={{ scale: 1, rotateX: 0 }}
+            transition={{ type: "spring", stiffness: 100, damping: 10, delay: 0.2 }}
+            style={{
+              fontSize: isFirst ? '10rem' : '7rem',
+              margin: 0, textAlign: 'center', fontFamily: 'Impact, sans-serif',
+              lineHeight: '1.1', textTransform: 'uppercase',
+              background: `linear-gradient(180deg, #ffffff 0%, ${color} 50%, #ffffff 100%)`,
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              filter: `drop-shadow(0 4px 15px ${color})`
+            }}
+          >
+            {text}
+          </motion.h1>
+        </motion.div>
+
+        {/* Epic Underline/Flourish */}
+        <motion.div
+          initial={{ scaleX: 0, opacity: 0 }}
+          animate={{ scaleX: 1, opacity: 1 }}
+          transition={{ delay: 1, duration: 0.8, ease: "easeOut" }}
+          style={{
+            width: '140%', height: '6px', 
+            background: `linear-gradient(90deg, transparent, ${color}, white, ${color}, transparent)`,
+            marginTop: '1rem', borderRadius: '50%',
+            boxShadow: `0 0 20px ${color}, 0 0 40px ${color}`
+          }}
+        />
+      </motion.div>
     </motion.div>
   );
 };
@@ -86,6 +172,7 @@ const Game = () => {
   }, [roomId, navigate]);
 
   const [prevCelebrating, setPrevCelebrating] = useState(false);
+  const winAudioRef = useRef(null);
 
   useEffect(() => {
     if (roomData && roomData.gameState) {
@@ -100,7 +187,12 @@ const Game = () => {
 
       const isCelebrating = roomData.gameState.state === 'celebrating';
       if (isCelebrating && !prevCelebrating) {
-        playSound('dude_oorum_blood'); // Play win audio for 1st/2nd/3rd place!
+        winAudioRef.current = playSound('dude_oorum_blood'); // Play win audio for 1st/2nd/3rd place!
+      } else if (!isCelebrating && prevCelebrating) {
+        if (winAudioRef.current) {
+          winAudioRef.current.stop();
+          winAudioRef.current = null;
+        }
       }
       setPrevCelebrating(isCelebrating);
     }
@@ -162,10 +254,10 @@ const Game = () => {
     };
 
     switch(diff) {
-      case 0: return { ...baseStyle, bottom: '2rem', left: '2rem', flexDirection: 'column' }; // Bottom-Left (Local)
-      case 1: return { ...baseStyle, top: '5rem', left: '2rem', flexDirection: 'column' };    // Top-Left
-      case 2: return { ...baseStyle, top: '5rem', right: '2rem', flexDirection: 'column' }; // Top-Right
-      case 3: return { ...baseStyle, bottom: '2rem', right: '2rem', flexDirection: 'column' }; // Bottom-Right
+      case 0: return { ...baseStyle, bottom: '2rem', left: '2rem', flexDirection: 'row' }; // Bottom-Left (Local)
+      case 1: return { ...baseStyle, top: '5rem', left: '2rem', flexDirection: 'row' };    // Top-Left
+      case 2: return { ...baseStyle, top: '5rem', right: '2rem', flexDirection: 'row' }; // Top-Right
+      case 3: return { ...baseStyle, bottom: '2rem', right: '2rem', flexDirection: 'row' }; // Bottom-Right
       default: return baseStyle;
     }
   };
@@ -372,7 +464,7 @@ const Game = () => {
                 </div>
                 
                 {/* Player info and Timer Profile */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', marginTop: '1rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                   
                   {/* Player Profile Picture with Timer Ring */}
                   <div style={{ position: 'relative', width: '68px', height: '68px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>

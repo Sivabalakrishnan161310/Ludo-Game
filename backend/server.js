@@ -255,7 +255,7 @@ io.on('connection', (socket) => {
                      io.to(roomId).emit('room_update', getSafeRoom(rooms[roomId]));
                      setupTurnTimer(roomId, io);
                   }
-                }, 6000);
+                }, 8000);
               }
             }
           }, delay);
