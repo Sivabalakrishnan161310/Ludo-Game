@@ -25,7 +25,8 @@ class LudoEngine {
           { id: 3, position: -1, status: 'base' }
         ],
         isKicked: false,
-        rank: null
+        rank: null,
+        rollsSinceLastSix: 0
       };
     });
     this.turnIndex = 0;
@@ -47,6 +48,9 @@ class LudoEngine {
     if (this.consecutiveSixes === 2) {
       // Force 1-5 on the 3rd roll to avoid skipping turn
       this.diceRoll = crypto.randomInt(1, 6); // 1 inclusive, 6 exclusive (1-5)
+    } else if (this.activePlayer.rollsSinceLastSix >= 8) {
+      // Bad luck protection: force a 6 after 8 non-six rolls
+      this.diceRoll = 6;
     } else {
       this.diceRoll = crypto.randomInt(1, 7); // 1 inclusive, 7 exclusive (1-6)
     }
@@ -55,8 +59,10 @@ class LudoEngine {
 
     if (this.diceRoll === 6) {
       this.consecutiveSixes++;
+      this.activePlayer.rollsSinceLastSix = 0;
     } else {
       this.consecutiveSixes = 0;
+      this.activePlayer.rollsSinceLastSix++;
     }
 
     // Determine valid moves
