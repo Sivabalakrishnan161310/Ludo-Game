@@ -32,16 +32,9 @@ class LudoEngine {
     });
     this.turnIndex = 0;
     this.currentRank = 1;
-    this.diceRoll = crypto.randomInt(1, 7); // Start with a random face instead of defaulting  nextTurn() {
-    // Natural Decay: Players cool off when it's not their turn
-    if (this.activePlayer) {
-      this.activePlayer.frustrationMeter = Math.max(0, (this.activePlayer.frustrationMeter || 0) - 5);
-      this.activePlayer.overpowerMeter = Math.max(0, (this.activePlayer.overpowerMeter || 0) - 5);
-    }
-
+    this.diceRoll = crypto.randomInt(1, 7); // Start with a random face instead of defaulting to 1
     this.consecutiveSixes = 0;
-    this.diceRoll = null;
-    this.validMoves = []; // waiting_for_roll, waiting_for_move, finished
+    this.state = 'waiting_for_roll'; // waiting_for_roll, waiting_for_move, finished
     this.turnDeadline = Date.now() + 45000; // 45 seconds timer
     this.lastAction = 'Game Started! Roll the dice.';
   }
@@ -359,6 +352,12 @@ class LudoEngine {
   }
 
   nextTurn() {
+    // Natural Decay: Players cool off when it's not their turn
+    if (this.activePlayer) {
+      this.activePlayer.frustrationMeter = Math.max(0, (this.activePlayer.frustrationMeter || 0) - 5);
+      this.activePlayer.overpowerMeter = Math.max(0, (this.activePlayer.overpowerMeter || 0) - 5);
+    }
+
     // Before moving turn, check if the game should already be over due to kicks/wins
     const activePlayers = this.players.filter(p => !p.isKicked && !p.rank);
     if (activePlayers.length <= 1) {
