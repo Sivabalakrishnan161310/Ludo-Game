@@ -25,8 +25,7 @@ class LudoEngine {
           { id: 3, position: -1, status: 'base' }
         ],
         isKicked: false,
-        rank: null,
-        rollsSinceLastSix: 0
+        rank: null
       };
     });
     this.turnIndex = 0;
@@ -42,27 +41,89 @@ class LudoEngine {
     return this.players[this.turnIndex];
   }
 
+  isSafeZone(pos) {
+    for (let i = 0; i < this.N; i++) {
+      if (pos === (i * 13 + 8)) return true;
+      if (pos === (i * 13 + 16) % this.mainTrackLength) return true;
+    }
+    return false;
+  }
+
+  calculateRiggedRoll() {
+    // 1. Initialize base weights for 1 through 6
+    const weights = { 1: 10, 2: 10, 3: 10, 4: 10, 5: 10, 6: 10 };
+    
+    // 2. Scan the board
+    const myTokens = this.activePlayer.tokens;
+    
+    // Check Rubberband: is the player stuck?
+    const tokensInBase = myTokens.filter(t => t.status === 'base').length;
+    if (tokensInBase === 4) {
+      weights[6] += 20; // 3x chance to get out of base
+    } else if (tokensInBase >= 2) {
+      weights[6] += 10; // 2x chance
+    }
+
+    // Check Capture Drama
+    const opponentTokens = [];
+    this.players.forEach(p => {
+      if (p.colorIndex !== this.activePlayer.colorIndex) {
+        p.tokens.forEach(t => {
+          if (t.status === 'main') opponentTokens.push(t.position);
+        });
+      }
+    });
+
+    myTokens.forEach(t => {
+      if (t.status === 'main') {
+        for (let roll = 1; roll <= 6; roll++) {
+          // Check if this roll leads to a capture
+          const startPos = this.activePlayer.colorIndex * 13 + 8;
+          let traveled = t.position >= startPos ? (t.position - startPos) : (this.mainTrackLength - startPos + t.position);
+          
+          if (traveled + roll <= this.travelToHomeStretch) {
+            const targetPos = (t.position + roll) % this.mainTrackLength;
+            if (!this.isSafeZone(targetPos) && opponentTokens.includes(targetPos)) {
+              // Capture opportunity found! Boost this roll heavily.
+              weights[roll] += 25; // Massive boost for maximum drama (forces more captures)
+            }
+          }
+        }
+      }
+    });
+
+    // 3. Weighted Random Selection
+    let totalWeight = 0;
+    for (let i = 1; i <= 6; i++) {
+      totalWeight += weights[i];
+    }
+    
+    let randomVal = crypto.randomInt(0, totalWeight);
+    for (let i = 1; i <= 6; i++) {
+      if (randomVal < weights[i]) {
+        return i;
+      }
+      randomVal -= weights[i];
+    }
+    return 6;
+  }
+
   rollDice(playerId) {
     if (this.state !== 'waiting_for_roll' || this.activePlayer.id !== playerId) return false;
 
     if (this.consecutiveSixes === 2) {
       // Force 1-5 on the 3rd roll to avoid skipping turn
       this.diceRoll = crypto.randomInt(1, 6); // 1 inclusive, 6 exclusive (1-5)
-    } else if (this.activePlayer.rollsSinceLastSix >= 8) {
-      // Bad luck protection: force a 6 after 8 non-six rolls
-      this.diceRoll = 6;
     } else {
-      this.diceRoll = crypto.randomInt(1, 7); // 1 inclusive, 7 exclusive (1-6)
+      this.diceRoll = this.calculateRiggedRoll();
     }
 
     this.lastAction = `${this.activePlayer.name} rolled a ${this.diceRoll}`;
 
     if (this.diceRoll === 6) {
       this.consecutiveSixes++;
-      this.activePlayer.rollsSinceLastSix = 0;
     } else {
       this.consecutiveSixes = 0;
-      this.activePlayer.rollsSinceLastSix++;
     }
 
     // Determine valid moves
@@ -152,12 +213,13 @@ class LudoEngine {
         this.lastAction = `${this.activePlayer.name} moved a token.`;
 
         // Check for captures
-        const capturedDistance = this.checkCapture(token.position, this.activePlayer.colorIndex);
-        if (capturedDistance > 0) {
+        const captureResult = this.checkCapture(token.position, this.activePlayer.colorIndex);
+        if (captureResult.capturedDistance > 0) {
           getAnotherTurn = true;
           this.lastAction = `${this.activePlayer.name} captured an opponent's token!`;
+          this.trollEvent = `${this.activePlayer.name} brutally captured ${captureResult.victimName}'s token and sent it all the way back to base!`;
           // Sequence: Attacker hops (diceRoll * 200ms) + Victim slides back (capturedDistance * 100ms) + buffers
-          this.animationDuration = (this.diceRoll * 200) + (capturedDistance * 100) + 600; 
+          this.animationDuration = (this.diceRoll * 200) + (captureResult.capturedDistance * 100) + 600; 
         } else {
           // Check if landed on safe zone
           const safeZones = [];
@@ -203,6 +265,7 @@ class LudoEngine {
         this.pendingCelebration = true;
         this.pendingNextTurn = true; // nextTurn will handle game over transition
         this.lastAction = `${this.activePlayer.name} finished ${this.getRankName(this.activePlayer.rank)}! ${activePlayers[0].name} is the LOSER!`;
+        this.trollEvent = `${activePlayers[0].name} is officially the biggest loser of this game! Roast them mercilessly for losing to ${this.activePlayer.name}.`;
       } else {
         // Still players left, trigger celebration
         this.pendingCelebration = true;
@@ -244,19 +307,19 @@ class LudoEngine {
 
   checkCapture(pos, myColorIndex) {
     // Cannot capture on safe zones
-    const greyStarIndices = [3, 16, 29, 42];
-    const startIndices = [8, 21, 34, 47];
-    if (greyStarIndices.includes(pos) || startIndices.includes(pos)) {
-      return 0; // Return 0 distance = no capture
+    if (this.isSafeZone(pos)) {
+      return { capturedDistance: 0, victimName: null }; // Return 0 distance = no capture
     }
 
     let capturedDistance = 0;
+    let victimName = null;
     for (let player of this.players) {
       if (player.colorIndex !== myColorIndex) {
         for (let token of player.tokens) {
           if (token.status === 'main' && token.position === pos) {
             token.status = 'base';
             token.position = -1;
+            victimName = player.name;
             
             // Calculate reverse distance back to base for timing
             const victimStartPos = player.colorIndex * 13 + 8;
@@ -266,7 +329,7 @@ class LudoEngine {
         }
       }
     }
-    return capturedDistance;
+    return { capturedDistance, victimName };
   }
 
   nextTurn() {

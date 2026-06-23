@@ -151,6 +151,7 @@ const Game = () => {
   
   const [rollTrigger, setRollTrigger] = useState(0);
   const [prevAction, setPrevAction] = useState('');
+  const [trollMessages, setTrollMessages] = useState([]);
 
   useEffect(() => {
     // Request current state when loading the game page
@@ -165,9 +166,18 @@ const Game = () => {
       navigate('/');
     });
 
+    socket.on('troll_message', (msg) => {
+      const id = Date.now() + Math.random();
+      setTrollMessages(prev => [...prev, { id, text: msg }]);
+      setTimeout(() => {
+        setTrollMessages(prev => prev.filter(m => m.id !== id));
+      }, 7000);
+    });
+
     return () => {
       socket.off('room_update');
       socket.off('room_not_found');
+      socket.off('troll_message');
     };
   }, [roomId, navigate]);
 
@@ -265,6 +275,36 @@ const Game = () => {
   return (
     <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', height: '100vh', padding: '1rem', overflow: 'hidden', background: '#0f172a', color: 'white' }}>
       
+      {/* Troll Messages Overlay */}
+      <div style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', zIndex: 3000, display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center', pointerEvents: 'none', width: '90%' }}>
+        <AnimatePresence>
+          {trollMessages.map(msg => (
+            <motion.div
+              key={msg.id}
+              initial={{ opacity: 0, y: -50, scale: 0.8 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.8 }}
+              style={{
+                background: 'rgba(15, 23, 42, 0.9)',
+                color: '#fff',
+                padding: '12px 24px',
+                borderRadius: '30px',
+                fontSize: '1.2rem',
+                fontWeight: 'bold',
+                boxShadow: '0 10px 25px rgba(236, 72, 153, 0.5)',
+                border: '2px solid #ec4899',
+                textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                textAlign: 'center',
+                lineHeight: '1.4',
+                backdropFilter: 'blur(5px)'
+              }}
+            >
+              🤖 {msg.text}
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
       {/* Celebration Overlay */}
       <AnimatePresence>
         {gameState.state === 'celebrating' && (

@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
 const LudoEngine = require('./engine');
+const { generateTrollMessage } = require('./gemini');
 
 const app = express();
 app.use(cors());
@@ -234,6 +235,14 @@ io.on('connection', (socket) => {
       if (success) {
         room.gameState = room.engine.getState();
         io.to(roomId).emit('room_update', getSafeRoom(room));
+
+        if (room.engine.trollEvent) {
+          const trollContext = room.engine.trollEvent;
+          room.engine.trollEvent = null;
+          generateTrollMessage(trollContext).then(msg => {
+            io.to(roomId).emit('troll_message', msg);
+          });
+        }
 
         if (room.engine.state === 'animating') {
           const delay = room.engine.animationDuration || 1500;
