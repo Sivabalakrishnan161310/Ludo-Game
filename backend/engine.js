@@ -25,14 +25,23 @@ class LudoEngine {
           { id: 3, position: -1, status: 'base' }
         ],
         isKicked: false,
-        rank: null
+        rank: null,
+        frustrationMeter: 0,
+        overpowerMeter: 0
       };
     });
     this.turnIndex = 0;
     this.currentRank = 1;
-    this.diceRoll = crypto.randomInt(1, 7); // Start with a random face instead of defaulting to 1
+    this.diceRoll = crypto.randomInt(1, 7); // Start with a random face instead of defaulting  nextTurn() {
+    // Natural Decay: Players cool off when it's not their turn
+    if (this.activePlayer) {
+      this.activePlayer.frustrationMeter = Math.max(0, (this.activePlayer.frustrationMeter || 0) - 5);
+      this.activePlayer.overpowerMeter = Math.max(0, (this.activePlayer.overpowerMeter || 0) - 5);
+    }
+
     this.consecutiveSixes = 0;
-    this.state = 'waiting_for_roll'; // waiting_for_roll, waiting_for_move, finished
+    this.diceRoll = null;
+    this.validMoves = []; // waiting_for_roll, waiting_for_move, finished
     this.turnDeadline = Date.now() + 45000; // 45 seconds timer
     this.lastAction = 'Game Started! Roll the dice.';
   }
@@ -49,70 +58,59 @@ class LudoEngine {
     return false;
   }
 
-  calculateRiggedRoll() {
-    // 1. Initialize base weights for 1 through 6
-    const weights = { 1: 10, 2: 10, 3: 10, 4: 10, 5: 10, 6: 10 };
-    
-    // 2. Scan the board
-    const myTokens = this.activePlayer.tokens;
-    
-    // Check Rubberband: is the player stuck?
-    let leaderHasProgress = false;
-    this.players.forEach(p => {
-      if (p.tokens.some(t => t.status !== 'base')) leaderHasProgress = true;
-    });
+  determineFlowStateRoll() {
+    const player = this.activePlayer;
+    const frustration = Math.min(100, Math.max(0, player.frustrationMeter || 0));
+    const overpower = Math.min(100, Math.max(0, player.overpowerMeter || 0));
 
-    const tokensInBase = myTokens.filter(t => t.status === 'base').length;
-    if (leaderHasProgress) {
-      if (tokensInBase === 4) {
-        weights[6] += 20; // 3x chance to get out of base
-      } else if (tokensInBase >= 2) {
-        weights[6] += 10; // 2x chance
+    // Star Power: Highly Frustrated Player (Needs a win)
+    if (frustration > 60) {
+      // If stuck in base, heavily favor a 6 (60% chance to force it)
+      const tokensInBase = player.tokens.filter(t => t.status === 'base').length;
+      if (tokensInBase > 0 && crypto.randomInt(0, 100) < 60) {
+        return 6;
       }
-    }
-
-    // Check Capture Drama
-    const opponentTokens = [];
-    this.players.forEach(p => {
-      if (p.colorIndex !== this.activePlayer.colorIndex) {
-        p.tokens.forEach(t => {
-          if (t.status === 'main') opponentTokens.push(t.position);
-        });
-      }
-    });
-
-    myTokens.forEach(t => {
-      if (t.status === 'main') {
-        for (let roll = 1; roll <= 6; roll++) {
-          // Check if this roll leads to a capture
-          const startPos = this.activePlayer.colorIndex * 13 + 8;
-          let traveled = t.position >= startPos ? (t.position - startPos) : (this.mainTrackLength - startPos + t.position);
-          
-          if (traveled + roll <= this.travelToHomeStretch) {
-            const targetPos = (t.position + roll) % this.mainTrackLength;
-            if (!this.isSafeZone(targetPos) && opponentTokens.includes(targetPos)) {
-              // Capture opportunity found! Boost this roll heavily.
-              weights[roll] += 25; // Massive boost for maximum drama (forces more captures)
+      
+      // Otherwise, see if they can capture someone and heavily favor it
+      let captureRoll = null;
+      const opponentTokens = [];
+      this.players.forEach(p => {
+        if (p.colorIndex !== player.colorIndex) {
+          p.tokens.forEach(t => {
+            if (t.status === 'main') opponentTokens.push(t.position);
+          });
+        }
+      });
+      player.tokens.forEach(t => {
+        if (t.status === 'main') {
+          for (let roll = 1; roll <= 6; roll++) {
+            const startPos = player.colorIndex * 13 + 8;
+            let traveled = t.position >= startPos ? (t.position - startPos) : (this.mainTrackLength - startPos + t.position);
+            if (traveled + roll <= this.travelToHomeStretch) {
+              const targetPos = (t.position + roll) % this.mainTrackLength;
+              if (!this.isSafeZone(targetPos) && opponentTokens.includes(targetPos)) {
+                captureRoll = roll;
+              }
             }
           }
         }
-      }
-    });
+      });
 
-    // 3. Weighted Random Selection
-    let totalWeight = 0;
-    for (let i = 1; i <= 6; i++) {
-      totalWeight += weights[i];
-    }
-    
-    let randomVal = crypto.randomInt(0, totalWeight);
-    for (let i = 1; i <= 6; i++) {
-      if (randomVal < weights[i]) {
-        return i;
+      if (captureRoll && crypto.randomInt(0, 100) < 60) {
+        return captureRoll; // Force the capture roll!
       }
-      randomVal -= weights[i];
     }
-    return 6;
+
+    // Blue Shell: Overpowered Player (Needs a nerf)
+    if (overpower > 70) {
+      // 50% chance to force a "dud" roll (1 or 2)
+      if (crypto.randomInt(0, 100) < 50) {
+        return crypto.randomInt(1, 3); // 1 or 2
+      }
+    }
+
+    // Normal Random Roll
+    return crypto.randomInt(1, 7);
   }
 
   rollDice(playerId) {
@@ -122,15 +120,25 @@ class LudoEngine {
       // Force 1-5 on the 3rd roll to avoid skipping turn
       this.diceRoll = crypto.randomInt(1, 6); // 1 inclusive, 6 exclusive (1-5)
     } else {
-      this.diceRoll = this.calculateRiggedRoll();
+      this.diceRoll = this.determineFlowStateRoll();
     }
 
     this.lastAction = `${this.activePlayer.name} rolled a ${this.diceRoll}`;
 
+    // Adjust Flow State Meters based on the roll
     if (this.diceRoll === 6) {
       this.consecutiveSixes++;
+      this.activePlayer.overpowerMeter += 15; // Getting a 6 makes you slightly overpowered
+      this.activePlayer.frustrationMeter = Math.max(0, this.activePlayer.frustrationMeter - 20); // Relieves frustration
     } else {
       this.consecutiveSixes = 0;
+      // If they are stuck in base and roll a dud, increase frustration
+      const tokensInBase = this.activePlayer.tokens.filter(t => t.status === 'base').length;
+      if (tokensInBase === 4) {
+        this.activePlayer.frustrationMeter += 15;
+      } else if (this.diceRoll <= 2) {
+        this.activePlayer.frustrationMeter += 5; // Dud roll
+      }
     }
 
     // Determine valid moves
@@ -225,6 +233,17 @@ class LudoEngine {
           getAnotherTurn = true;
           this.lastAction = `${this.activePlayer.name} captured an opponent's token!`;
           this.trollEvent = `${this.activePlayer.name} brutally captured ${captureResult.victimName}'s token and sent it all the way back to base!`;
+          
+          // Flow State Adjustments for Capture
+          this.activePlayer.overpowerMeter += 40; // Attacker becomes very overpowered
+          this.activePlayer.frustrationMeter = 0; // Attacker is very happy
+          
+          const victim = this.players.find(p => p.name === captureResult.victimName);
+          if (victim) {
+            victim.frustrationMeter += 50; // Victim becomes highly frustrated
+            victim.overpowerMeter = 0; // Victim is no longer overpowered
+          }
+
           // Sequence: Attacker hops (diceRoll * 200ms) + Victim slides back (capturedDistance * 100ms) + buffers
           this.animationDuration = (this.diceRoll * 200) + (captureResult.capturedDistance * 100) + 600; 
         } else {
