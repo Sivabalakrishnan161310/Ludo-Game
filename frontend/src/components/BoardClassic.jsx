@@ -538,41 +538,43 @@ const BoardClassic = ({ gameState, onTokenClick, localPlayerId }) => {
                 style={{ cursor: isHighlight ? 'pointer' : 'default' }}
                 onClick={() => onTokenClick && onTokenClick(token.id)}
               >
-                {/* Ground shadow (stays flat on board) */}
-                <ellipse cx={0} cy={10} rx={10} ry={4} fill="rgba(0,0,0,0.3)" />
+                <g transform={`rotate(${-boardRotation})`}>
+                  {/* Ground shadow (stays flat on board) */}
+                  <ellipse cx={0} cy={10} rx={10} ry={4} fill="rgba(0,0,0,0.3)" />
 
-                {/* Inner group that hops up during movement */}
-                <motion.g
-                  animate={innerAnimate}
-                  transition={innerTransition}
-                  key={stepPos ? `hop-${stepPos.x}-${stepPos.y}` : 'idle'}
-                >
-                  {/* === GLASS MAP PIN SHAPE === */}
-                  <path
-                    d="M 0,8 C -3,3 -12,-4 -12,-12 C -12,-18.6 -6.6,-24 0,-24 C 6.6,-24 12,-18.6 12,-12 C 12,-4 3,3 0,8 Z"
-                    fill={`url(#coinGrad-${pColorIndex})`}
-                    stroke="rgba(255,255,255,0.5)"
-                    strokeWidth="1.5"
-                    style={{ filter: `drop-shadow(0px 0px 6px ${colors[pColorIndex]})` }}
-                  />
-                  {/* Inner Hole */}
-                  <circle cx={0} cy={-12} r={4.5} fill="#FFFFFF" opacity="0.9" />
-                  {/* Glassy highlight on top-left edge */}
-                  <path
-                    d="M -8,-17 A 10,10 0 0,1 6,-22"
-                    fill="none"
-                    stroke="rgba(255,255,255,0.7)"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                  />
-                </motion.g>
-                
-                {/* Extra glowing ring if highlighted */}
-                {isHighlight && (
-                  <>
-                    <circle cx={0} cy={-2} r={18} fill="none" stroke="white" strokeWidth="2" strokeDasharray="4 4" opacity="0.9" />
-                  </>
-                )}
+                  {/* Inner group that hops up during movement */}
+                  <motion.g
+                    animate={innerAnimate}
+                    transition={innerTransition}
+                    key={stepPos ? `hop-${stepPos.x}-${stepPos.y}` : 'idle'}
+                  >
+                    {/* === GLASS MAP PIN SHAPE === */}
+                    <path
+                      d="M 0,8 C -3,3 -12,-4 -12,-12 C -12,-18.6 -6.6,-24 0,-24 C 6.6,-24 12,-18.6 12,-12 C 12,-4 3,3 0,8 Z"
+                      fill={`url(#coinGrad-${pColorIndex})`}
+                      stroke="rgba(255,255,255,0.5)"
+                      strokeWidth="1.5"
+                      style={{ filter: `drop-shadow(0px 0px 6px ${colors[pColorIndex]})` }}
+                    />
+                    {/* Inner Hole */}
+                    <circle cx={0} cy={-12} r={4.5} fill="#FFFFFF" opacity="0.9" />
+                    {/* Glassy highlight on top-left edge */}
+                    <path
+                      d="M -8,-17 A 10,10 0 0,1 6,-22"
+                      fill="none"
+                      stroke="rgba(255,255,255,0.7)"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    />
+                  </motion.g>
+                  
+                  {/* Extra glowing ring if highlighted */}
+                  {isHighlight && (
+                    <>
+                      <circle cx={0} cy={-2} r={18} fill="none" stroke="white" strokeWidth="2" strokeDasharray="4 4" opacity="0.9" />
+                    </>
+                  )}
+                </g>
               </motion.g>
             );
           });
