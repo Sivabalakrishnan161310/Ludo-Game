@@ -57,11 +57,18 @@ class LudoEngine {
     const myTokens = this.activePlayer.tokens;
     
     // Check Rubberband: is the player stuck?
+    let leaderHasProgress = false;
+    this.players.forEach(p => {
+      if (p.tokens.some(t => t.status !== 'base')) leaderHasProgress = true;
+    });
+
     const tokensInBase = myTokens.filter(t => t.status === 'base').length;
-    if (tokensInBase === 4) {
-      weights[6] += 20; // 3x chance to get out of base
-    } else if (tokensInBase >= 2) {
-      weights[6] += 10; // 2x chance
+    if (leaderHasProgress) {
+      if (tokensInBase === 4) {
+        weights[6] += 20; // 3x chance to get out of base
+      } else if (tokensInBase >= 2) {
+        weights[6] += 10; // 2x chance
+      }
     }
 
     // Check Capture Drama

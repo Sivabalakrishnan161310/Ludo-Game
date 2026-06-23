@@ -9,7 +9,7 @@ import Dice from '../components/Dice';
 import { playSound } from '../utils/audio';
 
 const classicColors = ['#EB1C24', '#66CCFF', '#FFE013', '#02A04B'];
-const starColors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#a855f7', '#06b6d4'];
+const starColors = ['#EB1C24', '#66CCFF', '#FFE013', '#02A04B', '#a855f7', '#ff9800'];
 
 const CelebrationOverlay = ({ winner }) => {
   useEffect(() => {

@@ -2,12 +2,12 @@ import React from 'react';
 import { motion } from 'framer-motion';
 
 const colors = [
-  '#ef4444', // Red
-  '#3b82f6', // Blue
-  '#10b981', // Green
-  '#f59e0b', // Yellow
+  '#EB1C24', // Classic Red
+  '#66CCFF', // Classic Blue
+  '#FFE013', // Classic Yellow
+  '#02A04B', // Classic Green
   '#a855f7', // Purple
-  '#06b6d4'  // Cyan
+  '#ff9800'  // Orange
 ];
 
 const Board = ({ players = [], onTokenClick, localPlayerId }) => {
