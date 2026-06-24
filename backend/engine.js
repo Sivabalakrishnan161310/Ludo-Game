@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { getEngineDecision } = require('./ludoEngine/index');
 
 class LudoEngine {
   constructor(players) {
@@ -51,59 +52,53 @@ class LudoEngine {
     return false;
   }
 
-  determineFlowStateRoll() {
-    const player = this.activePlayer;
-    const frustration = Math.min(100, Math.max(0, player.frustrationMeter || 0));
-    const overpower = Math.min(100, Math.max(0, player.overpowerMeter || 0));
+  getAdaptedGameState() {
+    return {
+      currentPlayerId: this.activePlayer.id,
+      players: this.players.map(p => ({
+        id: p.id,
+        coins: p.tokens.map(t => {
+          let distance = 0;
+          let isActive = t.status !== 'base';
+          let isFinished = t.status === 'home';
+          let isOnSafeTile = false;
 
-    // Star Power: Highly Frustrated Player (Needs a win)
-    if (frustration > 60) {
-      // If stuck in base, heavily favor a 6 (60% chance to force it)
-      const tokensInBase = player.tokens.filter(t => t.status === 'base').length;
-      if (tokensInBase > 0 && crypto.randomInt(0, 100) < 60) {
-        return 6;
-      }
-      
-      // Otherwise, see if they can capture someone and heavily favor it
-      let captureRoll = null;
-      const opponentTokens = [];
-      this.players.forEach(p => {
-        if (p.colorIndex !== player.colorIndex) {
-          p.tokens.forEach(t => {
-            if (t.status === 'main') opponentTokens.push(t.position);
-          });
-        }
-      });
-      player.tokens.forEach(t => {
-        if (t.status === 'main') {
-          for (let roll = 1; roll <= 6; roll++) {
-            const startPos = player.colorIndex * 13 + 8;
-            let traveled = t.position >= startPos ? (t.position - startPos) : (this.mainTrackLength - startPos + t.position);
-            if (traveled + roll <= this.travelToHomeStretch) {
-              const targetPos = (t.position + roll) % this.mainTrackLength;
-              if (!this.isSafeZone(targetPos) && opponentTokens.includes(targetPos)) {
-                captureRoll = roll;
-              }
-            }
+          if (t.status === 'main') {
+            const startPos = p.colorIndex * 13 + 8;
+            distance = t.position >= startPos ? (t.position - startPos) : (this.mainTrackLength - startPos + t.position);
+            isOnSafeTile = this.isSafeZone(t.position);
+          } else if (t.status === 'homestretch') {
+            distance = 51 + (t.position - 100);
+            isOnSafeTile = true;
+          } else if (t.status === 'home') {
+            distance = 56;
+            isOnSafeTile = true;
           }
-        }
-      });
 
-      if (captureRoll && crypto.randomInt(0, 100) < 60) {
-        return captureRoll; // Force the capture roll!
-      }
+          return {
+            id: t.id,
+            distance: distance,
+            absolutePosition: t.status === 'main' ? t.position : null,
+            status: t.status,
+            isActive: isActive,
+            isFinished: isFinished,
+            isOnSafeTile: isOnSafeTile
+          };
+        })
+      }))
+    };
+  }
+
+  determineFlowStateRoll() {
+    try {
+      const gameState = this.getAdaptedGameState();
+      const decision = getEngineDecision(gameState);
+      console.log(`[AI Engine] State: ${decision.state} | Tension: ${decision.tension} | Roll: ${decision.roll}`);
+      return decision.roll;
+    } catch (err) {
+      console.error("AI Engine error fallback:", err);
+      return crypto.randomInt(1, 7);
     }
-
-    // Blue Shell: Overpowered Player (Needs a nerf)
-    if (overpower > 70) {
-      // 50% chance to force a "dud" roll (1 or 2)
-      if (crypto.randomInt(0, 100) < 50) {
-        return crypto.randomInt(1, 3); // 1 or 2
-      }
-    }
-
-    // Normal Random Roll
-    return crypto.randomInt(1, 7);
   }
 
   rollDice(playerId) {
