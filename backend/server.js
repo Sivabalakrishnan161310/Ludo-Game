@@ -5,7 +5,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
 const LudoEngine = require('./engine');
-const { generateTrollMessage } = require('./gemini');
+const { generateTrollMessage, generateGameStateTrollMessage } = require('./gemini');
 
 const app = express();
 app.use(cors());
@@ -79,6 +79,7 @@ io.on('connection', (socket) => {
         gameState: null, // Will hold the board state later
         timeout: setTimeout(() => {
           if (rooms[roomId]) {
+            if (rooms[roomId].trollInterval) clearInterval(rooms[roomId].trollInterval);
             delete rooms[roomId];
             console.log(`Room ${roomId} forcefully deleted after 3 hours.`);
           }
@@ -161,6 +162,18 @@ io.on('connection', (socket) => {
           io.to(roomId).emit('game_started', getSafeRoom(room));
           io.to(roomId).emit('room_update', getSafeRoom(room));
           setupTurnTimer(roomId, io);
+          
+          room.trollInterval = setInterval(async () => {
+             if (rooms[roomId] && rooms[roomId].status === 'playing' && rooms[roomId].engine) {
+                 const summary = rooms[roomId].engine.getSummaryString();
+                 const msg = await generateGameStateTrollMessage(summary);
+                 if (msg) {
+                     io.to(roomId).emit('troll_message', msg);
+                 }
+             } else if (rooms[roomId] && rooms[roomId].status !== 'playing') {
+                 clearInterval(rooms[roomId].trollInterval);
+             }
+          }, 3 * 60 * 1000);
         } else {
           socket.emit('error_message', 'Not all players are ready.');
         }
@@ -201,6 +214,18 @@ io.on('connection', (socket) => {
   });
 
   // Game Actions
+  // Handle Chat Message
+  socket.on('send_chat_message', ({ roomId, message, senderName }) => {
+    if (rooms[roomId]) {
+      io.to(roomId).emit('chat_message', {
+        id: Date.now() + Math.random(),
+        senderName,
+        message,
+        timestamp: Date.now()
+      });
+    }
+  });
+
   socket.on('roll_dice', ({ roomId }) => {
     const room = rooms[roomId];
     if (room && room.engine) {
@@ -323,6 +348,7 @@ io.on('connection', (socket) => {
             console.log(`Room ${roomId} is empty but playing. Keeping alive for reconnection.`);
           } else {
             clearTimeout(room.timeout);
+            if (room.trollInterval) clearInterval(room.trollInterval);
             delete rooms[roomId];
             console.log(`Room ${roomId} deleted (empty and not playing)`);
           }

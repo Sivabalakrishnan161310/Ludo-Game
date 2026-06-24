@@ -6,6 +6,7 @@ import { socket } from './Lobby';
 import Board from '../components/Board';
 import BoardClassic from '../components/BoardClassic';
 import Dice from '../components/Dice';
+import Chat from '../components/Chat';
 import { playSound } from '../utils/audio';
 
 const classicColors = ['#EB1C24', '#66CCFF', '#FFE013', '#02A04B'];
@@ -563,6 +564,11 @@ const Game = () => {
         </div>
 
       </div>
+
+      {/* Real-time Chat UI */}
+      {roomData && localPlayer && (
+        <Chat socket={socket} roomId={roomId} localPlayerName={localPlayer.name} />
+      )}
     </div>
   );
 };

@@ -40,4 +40,33 @@ Generate a troll message:`;
   }
 }
 
-module.exports = { generateTrollMessage };
+async function generateGameStateTrollMessage(stateContext) {
+  if (!ai || !process.env.GEMINI_API_KEY) return '😂';
+
+  const prompt = `You are a highly sarcastic, slightly toxic, and hilarious Ludo AI commentator. 
+Every 3 minutes, you give a status update on the game. Your goal is to troll all the players based on their current progress.
+Rule 1: Keep it to ONE OR TWO punchy sentences.
+Rule 2: Use emojis.
+Rule 3: Mention players by name. Mock whoever is losing or stuck in base, and be sarcastically suspicious of the leader.
+
+${stateContext}
+
+Generate the 3-minute troll update:`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-lite',
+      contents: prompt,
+      config: {
+        maxOutputTokens: 80,
+        temperature: 1.0,
+      }
+    });
+    return response.text.trim();
+  } catch (error) {
+    console.error("Gemini Error:", error.message);
+    return '🤣';
+  }
+}
+
+module.exports = { generateTrollMessage, generateGameStateTrollMessage };

@@ -422,6 +422,17 @@ class LudoEngine {
       turnDeadline: this.turnDeadline
     };
   }
+
+  getSummaryString() {
+    let summary = `Current Ludo Game State:\n`;
+    this.players.forEach(p => {
+      const home = p.tokens.filter(t => t.status === 'home').length;
+      const base = p.tokens.filter(t => t.status === 'base').length;
+      const main = p.tokens.filter(t => t.status === 'main' || t.status === 'homestretch').length;
+      summary += `- ${p.name}: ${home} tokens finished, ${main} active on board, ${base} stuck in base.\n`;
+    });
+    return summary;
+  }
 }
 
 module.exports = LudoEngine;
