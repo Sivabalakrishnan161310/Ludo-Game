@@ -2,7 +2,7 @@ const { getForwardGap, getLeader } = require('./analyseBoardSituation');
 
 // ── PEACEFUL: find the roll that clusters coins together ──────────────────────
 function pickDice_Peaceful(players) {
-  let bestRoll = Math.floor(Math.random() * 6) + 1;
+  let bestRolls = [];
   let bestProximityGain = -Infinity;
 
   for (let roll = 1; roll <= 6; roll++) {
@@ -31,18 +31,19 @@ function pickDice_Peaceful(players) {
       });
     });
 
-    // Add some randomness to tie-breaks
-    if (proximityGain > bestProximityGain || (proximityGain === bestProximityGain && Math.random() > 0.5)) {
+    if (proximityGain > bestProximityGain) {
       bestProximityGain = proximityGain;
-      bestRoll = roll;
+      bestRolls = [roll];
+    } else if (proximityGain === bestProximityGain) {
+      bestRolls.push(roll);
     }
   }
-  return bestRoll;
+  return bestRolls[Math.floor(Math.random() * bestRolls.length)];
 }
 
 // ── TENSE: find the roll with highest drama (captures + threats + blockades) ──
 function pickDice_Tense(players) {
-  let bestRoll = Math.floor(Math.random() * 6) + 1;
+  let bestRolls = [];
   let bestDramaScore = -Infinity;
 
   for (let roll = 1; roll <= 6; roll++) {
@@ -89,18 +90,20 @@ function pickDice_Tense(players) {
       });
     });
 
-    if (dramaScore > bestDramaScore || (dramaScore === bestDramaScore && Math.random() > 0.5)) {
+    if (dramaScore > bestDramaScore) {
       bestDramaScore = dramaScore;
-      bestRoll = roll;
+      bestRolls = [roll];
+    } else if (dramaScore === bestDramaScore) {
+      bestRolls.push(roll);
     }
   }
-  return bestRoll;
+  return bestRolls[Math.floor(Math.random() * bestRolls.length)];
 }
 
 // ── CRITICAL: find the roll that lets hunters catch the leader ────────────────
 function pickDice_Critical(players) {
   const leader = getLeader(players);
-  let bestRoll = Math.floor(Math.random() * 6) + 1;
+  let bestRolls = [];
   let bestHuntScore = -Infinity;
 
   for (let roll = 1; roll <= 6; roll++) {
@@ -124,12 +127,14 @@ function pickDice_Critical(players) {
       });
     });
 
-    if (huntScore > bestHuntScore || (huntScore === bestHuntScore && Math.random() > 0.5)) {
+    if (huntScore > bestHuntScore) {
       bestHuntScore = huntScore;
-      bestRoll = roll;
+      bestRolls = [roll];
+    } else if (huntScore === bestHuntScore) {
+      bestRolls.push(roll);
     }
   }
-  return bestRoll;
+  return bestRolls[Math.floor(Math.random() * bestRolls.length)];
 }
 
 module.exports = {
