@@ -1,44 +1,11 @@
 const { getForwardGap, getLeader } = require('./analyseBoardSituation');
 
 // ── PEACEFUL: find the roll that clusters coins together ──────────────────────
+// The previous logic inadvertently always maximized the roll (i.e. picked 6) 
+// because moving forward by 6 always reduced the shortest path distance the most.
+// In a peaceful state, it's best to just let the game flow naturally with a random roll.
 function pickDice_Peaceful(players) {
-  let bestRolls = [];
-  let bestProximityGain = -Infinity;
-
-  for (let roll = 1; roll <= 6; roll++) {
-    let proximityGain = 0;
-
-    players.forEach(player => {
-      player.coins.filter(c => c.status === 'main').forEach(coin => {
-        const newPos = (coin.absolutePosition + roll) % 52;
-        
-        players.forEach(enemy => {
-          if (enemy.id === player.id) return;
-          enemy.coins.filter(c => c.status === 'main').forEach(enemyCoin => {
-            // How far is enemy from coin currently?
-            const oldDist1 = getForwardGap(coin.absolutePosition, enemyCoin.absolutePosition);
-            const oldDist2 = getForwardGap(enemyCoin.absolutePosition, coin.absolutePosition);
-            const oldDist = Math.min(oldDist1, oldDist2); // shortest path distance
-
-            // How far will enemy be after move?
-            const newDist1 = getForwardGap(newPos, enemyCoin.absolutePosition);
-            const newDist2 = getForwardGap(enemyCoin.absolutePosition, newPos);
-            const newDist = Math.min(newDist1, newDist2);
-
-            proximityGain += (oldDist - newDist);
-          });
-        });
-      });
-    });
-
-    if (proximityGain > bestProximityGain) {
-      bestProximityGain = proximityGain;
-      bestRolls = [roll];
-    } else if (proximityGain === bestProximityGain) {
-      bestRolls.push(roll);
-    }
-  }
-  return bestRolls[Math.floor(Math.random() * bestRolls.length)];
+  return Math.floor(Math.random() * 6) + 1;
 }
 
 // ── TENSE: find the roll with highest drama (captures + threats + blockades) ──
