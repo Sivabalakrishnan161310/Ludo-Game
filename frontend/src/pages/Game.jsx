@@ -169,10 +169,8 @@ const Game = () => {
 
     socket.on('troll_message', (msg) => {
       const id = Date.now() + Math.random();
-      setTrollMessages(prev => [...prev, { id, text: msg }]);
-      setTimeout(() => {
-        setTrollMessages(prev => prev.filter(m => m.id !== id));
-      }, 7000);
+      // Replace existing messages so only the newest one is shown
+      setTrollMessages([{ id, text: msg }]);
     });
 
     return () => {
@@ -297,10 +295,40 @@ const Game = () => {
                 textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
                 textAlign: 'center',
                 lineHeight: '1.4',
-                backdropFilter: 'blur(5px)'
+                backdropFilter: 'blur(5px)',
+                pointerEvents: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center'
               }}
             >
-              🤖 {msg.text}
+              <div>🤖 {msg.text}</div>
+              <button
+                onClick={() => setTrollMessages([])}
+                style={{
+                  marginTop: '12px',
+                  padding: '6px 24px',
+                  background: 'linear-gradient(135deg, #ec4899 0%, #a855f7 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '20px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '0.9rem',
+                  boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
+                  transition: 'transform 0.2s, boxShadow 0.2s'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                  e.currentTarget.style.boxShadow = '0 6px 15px rgba(236, 72, 153, 0.5)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.boxShadow = '0 4px 10px rgba(0,0,0,0.3)';
+                }}
+              >
+                Read
+              </button>
             </motion.div>
           ))}
         </AnimatePresence>
