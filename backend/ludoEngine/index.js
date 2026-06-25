@@ -11,9 +11,9 @@ function getEngineDecision(gameState) {
 
   // Layer 2: pick the dice roll
   let chosenRoll;
-  if      (gameState_label === 'PEACEFUL')  chosenRoll = pickDice_Peaceful(players);
-  else if (gameState_label === 'TENSE')     chosenRoll = pickDice_Tense(players);
-  else                                      chosenRoll = pickDice_Critical(players);
+  if      (gameState_label === 'PEACEFUL')  chosenRoll = pickDice_Peaceful(players, currentPlayer);
+  else if (gameState_label === 'TENSE')     chosenRoll = pickDice_Tense(players, currentPlayer);
+  else                                      chosenRoll = pickDice_Critical(players, currentPlayer);
 
   // Layer 3: pick which coin to move (we'll calculate this in case we need it for bots, 
   // but as requested, we won't force it on humans)
